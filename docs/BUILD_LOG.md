@@ -140,3 +140,47 @@ Samuel asked for Phases 2–4 to run back to back, stopping only if blocked or w
 1. The PES mapping seed `transform/seeds/pes_region_map.csv`, and the resulting `dim_region` (14/14 mapped; e.g. North West England → pes16 ENWL).
 2. The change to refetch recent chunks in the backfill (DECISIONS.md).
 3. The 1,761 missing generation-mix periods (46 days): larger than the national gaps. The site should say so.
+
+
+---
+
+## Session 2 (cont.) — Phase 3: the site (Now and Plan)
+
+### What was built
+- `pipeline/export.py`: writes `regions.json`, `region_now.json`, `region_48h.json`, `pipeline_health.json` and `meta.json` to `web/public/data/` (about 87 KB in total). It refuses to write empty datasets. It's wired into `pipeline.run`, which exports only after a successful `dbt build`.
+- `web/`: Vite + React + TypeScript + ECharts, using the DESIGN.md tokens (dark default, light toggle), Inter, and a bottom tab bar under 768 px.
+  - **Now:** region selector (default North West England, remembered for the session), headline intensity with the band in words, a plain-English sentence, the generation-mix donut, a clickable tile map of the 14 regions, and a ranked table.
+  - **Plan:** 48 h forecast chart with the cleanest window shaded and a "Now" line; best-window finder (EV 4 h, washing machine 2 h, dishwasher 2 h, custom) with CO₂ saved against starting now and the assumptions stated; the forecast also available as a table.
+  - Header badge "Data last updated", and a footer with credits, licences and a non-affiliation note.
+  - Trust, Explore and How it works are placeholders until Phase 4.
+- Tests: 7 Vitest unit tests for the best-window finder, 16 Playwright smoke tests (desktop and 360 px), and 5 new pytest tests for the export (34 pytest tests in total).
+
+### What broke and how it was fixed
+- `test` config in `vite.config.ts` failed type-checking under Vite 8, so I moved it to `vitest.config.ts` (which also stops Vitest picking up Playwright specs).
+- **`pipeline.run` export crashed** ("Can't open a connection to same database file with a different configuration"): dbt keeps a read-write DuckDB connection open in the same process. The export now opens with the same settings when called from `run`. My first check missed this because I filtered the output with grep, which hid the exit code. I then checked the file timestamps, found the files hadn't been rewritten, and reran unfiltered.
+- The 360 px overflow test failed (6 px) after adding the mobile "Updated" badge; shortened it to the time only.
+- An oxlint warning showed the Plan forecast series was rebuilt every render; now memoised.
+- Lighthouse on Windows prints `EPERM` when deleting its temporary browser profile *after* saving the report. The scores are valid; it's a known Windows cleanup quirk.
+
+### Phase 3 acceptance checks
+- [x] **`npm run build` succeeds; the built site works from a static file server.**
+  ```
+  npm run build  ->  ✓ built in 1.24s  (dist/assets/index-*.js 869.84 kB │ gzip: 286.25 kB)
+  STATIC_SERVER=python npx playwright test   ->  16 passed (14.5s)   [python -m http.server --directory dist]
+  ```
+  I confirmed afterwards that port 4173 was free, so no existing server was reused.
+- [x] **Now page shows current intensity, band name, generation mix and a clickable GB map; default region North West.**
+  Screenshot check (desktop): "North West England, 20:00–20:30 BST · 10 gCO₂/kWh · Very low · North West England is cleaner than the GB average right now (10 vs 84 gCO₂/kWh), mainly thanks to wind." Donut "Wind is the biggest source right now". Tile map with values.
+  Playwright: `Now page defaults to North West England and the map selects a region`: default value `3`; clicking the London tile sets `13`; the choice persists on the Plan page. Passes on desktop and 360 px.
+- [x] **Best-window finder returns the correct window (unit test with a known series).**
+  `npm test` → `Tests 7 passed (7)`. Series `[100, 90, 80, 50, 10, 20, 60, 70]`: the 2-slot best starts at index 4 (average 15; now 95); the 4-slot best starts at index 3 (average 35); it never starts before now, breaks ties by earliest start, skips gaps, returns null if the task is too long, and CO₂ saved = (95 − 15) × 28.
+- [x] **Pages usable at 360 px; Lighthouse accessibility ≥ 90.**
+  Lighthouse (Edge headless): **Now a11y 100**, **Plan a11y 100**. The Playwright `mobile-360` project passes every page, including a check for no horizontal scroll.
+  (Performance: Now 32, Plan 54 on simulated slow 4G. Not a Phase 3 criterion; to address for Phase 5's load-time target.)
+- [x] **Playwright smoke test opens every page without console errors.**
+  `npx playwright test` → `16 passed`: every page on desktop and 360 px, checking console errors, page errors, failed requests and HTTP ≥ 400.
+
+### For Samuel to review (Phase 3)
+1. The tile map instead of real boundaries (DECISIONS.md). It works well for clicking and accessibility, but it's a design choice you may want to change.
+2. The kWh assumptions on the Plan page (EV 28 kWh, washing 1 kWh, dishwasher 1.2 kWh).
+3. Wording of the plain-English sentence (`web/src/lib/sentence.ts`).

@@ -1,7 +1,7 @@
 """Run the whole pipeline end to end.
 
-    python -m pipeline.run                 # ingest, snapshot, dbt build
-    python -m pipeline.run --skip-ingest   # rebuild the warehouse from raw files only
+    python -m pipeline.run                 # ingest, snapshot, dbt build, export JSON
+    python -m pipeline.run --skip-ingest   # rebuild from raw files only (no API calls)
 """
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from pipeline import backfill, config, snapshot
+from pipeline import backfill, config, export, snapshot
 
 log = logging.getLogger("pipeline.run")
 
@@ -72,7 +72,12 @@ def main(argv: list[str] | None = None) -> int:
     log.info("dbt build success=%s; tests: %s", result.success, summary["counts"])
     if not ingest_ok:
         log.error("ingestion had failures; see messages above")
-    return 0 if (result.success and ingest_ok) else 1
+    if not result.success:
+        # Never publish site data from a build whose tests failed.
+        log.error("dbt build failed; site data NOT exported")
+        return 1
+    export.main(read_only=False)
+    return 0 if ingest_ok else 1
 
 
 if __name__ == "__main__":

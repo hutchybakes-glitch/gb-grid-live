@@ -61,3 +61,16 @@ DuckDB, dbt, pandas and the modelling libraries will be added in the phase that 
 - **No dbt packages** (such as dbt_utils): the two generic tests needed are 10 lines of macros, and the build then needs no network access.
 - **dbt schemas are named after layers** (`bronze.`, `silver.`, `dim.`, `gold.`, `ref.`) via `generate_schema_name`.
 - **`gold_region_now` and `gold_region_48h` come from the latest forecast snapshot**, because the site needs a forecast and ranged history is only as fresh as the last backfill.
+
+
+## 2026-09-27 — Phase 3 decisions
+- **GB map is a tile map (one square per region, placed roughly geographically), not real boundaries.** Real DNO boundary files would need a separate licence check and credit, and add around 100 KB+. Tiles are equal-sized, so small regions such as London stay clickable. Each tile is a keyboard-accessible button that shows its value as text. Options considered: NESO DNO boundary GeoJSON (more realistic, but heavier, with a licence to check and tiny London), or a plain list (not a map). Could be swapped for real boundaries later; logged as a question.
+- **Hash routing (`#/plan`)** instead of a router library: it works on any static host, including GitHub Pages, with no 404 rewrites, and needs no extra dependency.
+- **Vite `base: './'`**, so the same build works from `/`, a Pages project subfolder, or a plain file server.
+- **"Now" figures come from the latest forecast snapshot**, not from measured values. Regional data has no actuals, so the page says so under the headline.
+- **Best-window finder rules:** it never starts before the current half-hour; ties go to the earliest start; windows spanning a missing half-hour are skipped. Stated kWh assumptions: EV 28 kWh (7 kW × 4 h), washing machine 1 kWh, dishwasher 1.2 kWh, custom = user input. Saving = (average if started now − best average) × kWh.
+- **Region choice is stored in `sessionStorage`** ("remembered for the session", per SPEC). The theme is stored in `localStorage`. Both are wrapped in try/catch, so blocked storage doesn't break the page.
+- **Only the ECharts parts that are used are imported.** The bundle is still 870 KB (286 KB gzipped); Lighthouse performance on simulated slow 4G is 32 (Now) and 54 (Plan). Accessibility, the Phase 3 criterion, is 100. Load time is a Phase 5 criterion and is noted there.
+- **Playwright runs against the production build**, with a second mode (`STATIC_SERVER=python`) using `python -m http.server` to prove the site works from a plain static file server.
+- **`pipeline.run` exports JSON only if `dbt build` succeeded**, so a failing data test can never publish bad data to the site.
+- **Site data JSON (`web/public/data/`) is committed**, so a fresh clone builds and runs without the warehouse.
