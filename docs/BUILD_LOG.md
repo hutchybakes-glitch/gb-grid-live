@@ -267,3 +267,15 @@ The GitHub credentials stored on this machine belong to the account `sammyhutch`
 - [ ] GitHub Actions run succeeds on a schedule and deploys the site: **not yet run (blocked on push).**
 - [ ] Public URL loads in under 2 seconds: **not yet measurable.**
 - [x] README explains the project in 3 sentences, with screenshots and setup steps (done locally; not yet on GitHub).
+
+
+### Update: NESO demand data added (Samuel: "happy to go with your suggestions")
+- New source: **NESO Historic Demand Data** (NESO Data Portal, NESO Open Data Licence, no key). `pipeline/ingest/neso_demand.py` reads the dataset listing to find each year's CSV URL (never guessed) and downloads 2023 to the current year: 4 requests, rate-limited, with the shared retries. The current year is refetched every run, and the previous year during January. It's wired into `pipeline.run`.
+- dbt: `bronze_neso_demand` (three different date formats across years, `01-Jan-23`, `01-JAN-2024` and `2025-01-01`, all parsed), `silver_demand` (actual rows only; settlement periods converted from UK local time to UTC via local midnight), and `gold_solar_profile` renamed to **`gold_solar_vs_demand`** as DATA.md planned, now with average national demand. Explore's hidden-solar chart now shows demand as the grid sees it: on an average summer day it is 23.3 GW at 08:00 and 21.3 GW at 13:00, when solar peaks at 8.8 GW.
+- Tests: dbt unit test `demand_settlement_periods_convert_to_utc_across_clock_change` (spring-forward day and BST day, forecast rows dropped), `unique`, `not_null` and a 5–70 GW range on `silver_demand`, plus 5 pytest tests. Totals: `dbt build` PASS=90 WARN=1 (unchanged warning); pytest 46 passed; Playwright 18 passed.
+- **Broke and fixed:**
+  - NESO download links redirect to their file storage; the shared HTTP client now follows redirects.
+  - **My bug:** saving the CSV in Python text mode on Windows turned `\r\n` into `\r\r\n`, which DuckDB couldn't parse. It now writes with `newline=""`, with a regression test.
+  - A `sed` edit mangled a code comment; I repaired it by hand.
+- Demand actuals currently run to 2026-09-06: NESO updates the file periodically, not daily.
+- The earlier open question about adding demand data is now resolved.

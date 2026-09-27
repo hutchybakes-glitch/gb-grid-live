@@ -4,7 +4,7 @@
 
 **Live site: https://hutchybakes-glitch.github.io/gb-grid-live/**
 
-GB Grid Live shows how clean electricity is in each region of Great Britain right now, and finds the cleanest time in the next 48 hours to charge a car or run the washing machine. Behind it is a daily data pipeline (Python, DuckDB, dbt) that ingests two open APIs, tests the data, and publishes a static site through GitHub Actions. It also checks how accurate the official NESO carbon forecast is, and backtests an error-correction model against it honestly.
+GB Grid Live shows how clean electricity is in each region of Great Britain right now, and finds the cleanest time in the next 48 hours to charge a car or run the washing machine. Behind it is a daily data pipeline (Python, DuckDB, dbt) that ingests open data from NESO and Sheffield Solar, tests the data, and publishes a static site through GitHub Actions. It also checks how accurate the official NESO carbon forecast is, and backtests an error-correction model against it honestly.
 
 | Now | Plan (mobile) |
 | --- | --- |
@@ -65,6 +65,7 @@ npm run e2e          # smoke tests against the production build (desktop and 360
 ## Data sources and credits
 - **Carbon Intensity API**, NESO, CC BY 4.0: https://carbonintensity.org.uk
 - **PV_Live**, Sheffield Solar (University of Sheffield), funded by NESO: https://www.solar.sheffield.ac.uk/pvlive/
+- **Historic Demand Data**, NESO, NESO Open Data Licence: https://www.neso.energy/data-portal/historic-demand-data
 
 Independent project, not affiliated with NESO or Sheffield Solar.
 

@@ -42,3 +42,19 @@ unit_tests:
         - {grouping: local_hour, group_key: "14", n: 1, mae: 0.0, bias: 0.0, rmse: 0.0, mae_pct_of_mean: 0.0}
         - {grouping: wind_regime, group_key: "low wind (<20%)", n: 1, mae: 10.0, bias: 10.0, rmse: 10.0, mae_pct_of_mean: 9.1}
         - {grouping: wind_regime, group_key: "high wind (40%+)", n: 2, mae: 10.0, bias: -10.0, rmse: 14.14, mae_pct_of_mean: 10.5}
+
+  - name: demand_settlement_periods_convert_to_utc_across_clock_change
+    description: "Spring-forward day 2026-03-29: period 1 = 00:00 GMT, period 3 = 02:00 BST = 01:00 UTC. Summer: period 1 = 00:00 BST = 23:00 UTC the day before. Forecast rows are dropped."
+    model: silver_demand
+    given:
+      - input: ref('bronze_neso_demand')
+        rows:
+          - {settlement_date: "2026-03-29", settlement_period: 1, national_demand_mw: 20000, forecast_actual: A, _source_file: a.csv}
+          - {settlement_date: "2026-03-29", settlement_period: 3, national_demand_mw: 21000, forecast_actual: A, _source_file: a.csv}
+          - {settlement_date: "2026-07-01", settlement_period: 1, national_demand_mw: 18000, forecast_actual: A, _source_file: a.csv}
+          - {settlement_date: "2026-07-01", settlement_period: 2, national_demand_mw: 99999, forecast_actual: F, _source_file: a.csv}
+    expect:
+      rows:
+        - {period_start_utc: "2026-03-29 00:00:00", national_demand_mw: 20000}
+        - {period_start_utc: "2026-03-29 01:00:00", national_demand_mw: 21000}
+        - {period_start_utc: "2026-06-30 23:00:00", national_demand_mw: 18000}

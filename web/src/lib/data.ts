@@ -107,7 +107,7 @@ export interface InsightRow {
 export interface Explore {
   heatmap: { local_month: number; local_hour: number; avg_actual_gco2_kwh: number; n: number }[]
   league: { window_days: number; rank: number; region_id: number; short_name: string; n: number; avg_gco2_kwh: number; pct_low_or_very_low: number }[]
-  solar: { season: 'summer' | 'winter'; slot: number; local_time: string; n: number; avg_solar_mw: number; avg_actual_gco2_kwh: number }[]
+  solar: { season: 'summer' | 'winter'; slot: number; local_time: string; n: number; avg_solar_mw: number; avg_demand_mw: number | null; avg_actual_gco2_kwh: number }[]
   solar_peak: { at_utc: string; mw: number }
   insights: InsightRow[]
 }

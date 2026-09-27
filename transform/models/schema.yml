@@ -148,8 +148,8 @@ models:
     data_tests:
       - unique_combination:
               arguments: {columns: [window_days, region_id]}
-  - name: gold_solar_profile
-    description: Average national solar (PV_Live) and intensity by local half-hour, summer vs winter.
+  - name: gold_solar_vs_demand
+    description: Average national solar (PV_Live), national demand (NESO ND) and intensity by local half-hour, summer vs winter.
     data_tests:
       - unique_combination:
               arguments: {columns: [season, slot]}
@@ -167,6 +167,21 @@ models:
     columns:
       - name: period_start_utc
         data_tests: [unique, not_null]
+  - name: bronze_neso_demand
+    description: NESO Historic Demand Data rows from every yearly CSV.
+    columns:
+      - name: settlement_date
+        data_tests: [not_null]
+  - name: silver_demand
+    description: National demand (ND) per UTC half-hour, actuals only, converted from local settlement periods.
+    columns:
+      - name: period_start_utc
+        data_tests: [unique, not_null]
+      - name: national_demand_mw
+        data_tests:
+          - not_null
+          - between:
+              arguments: {min_value: 5000, max_value: 70000}
 
 seeds:
   - name: pes_region_map

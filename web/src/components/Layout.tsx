@@ -55,7 +55,8 @@ export default function Layout({ page, children }: Props) {
           <p>
             Data: <a href="https://carbonintensity.org.uk">Carbon Intensity API</a> by NESO, licensed{' '}
             <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.{' '}
-            Solar: <a href="https://www.solar.sheffield.ac.uk/pvlive/">PV_Live</a> by Sheffield Solar, University of Sheffield, funded by NESO.
+            Solar: <a href="https://www.solar.sheffield.ac.uk/pvlive/">PV_Live</a> by Sheffield Solar, University of Sheffield, funded by NESO.{' '}
+            Demand: <a href="https://www.neso.energy/data-portal/historic-demand-data">NESO Historic Demand Data</a>, NESO Open Data Licence.
           </p>
           <p>Independent project, not affiliated with NESO or Sheffield Solar. Times are UK local time unless stated.</p>
         </div>

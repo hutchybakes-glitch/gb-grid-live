@@ -93,3 +93,8 @@ DuckDB, dbt, pandas and the modelling libraries will be added in the phase that 
 - **Snapshots are gzipped** (about 18x smaller) so the snapshots branch grows by about 15 MB a year.
 - **The workflow fails, and does not deploy, if ingestion or any dbt test fails**, so Pages keeps serving the last good build instead of partial data.
 - **Schedule: 05:30 UTC daily.** It runs before the morning, so the day-ahead snapshot captures a full 48 h from early morning.
+
+## 2026-09-27 — NESO demand data added
+- **Added NESO Historic Demand Data** so the hidden-solar chart shows solar against demand, as SPEC.md describes. This supersedes the Phase 4 "solar vs intensity" fallback. Licence: NESO Open Data Licence (credited in the site footer).
+- **Yearly CSV download** instead of the per-row datastore API: 4 requests in total, versus hundreds of paginated calls.
+- **Settlement periods are local-time based** (46 or 50 on clock-change days), so UTC = local midnight + 30 min x (period - 1), computed through the Europe/London timezone and unit-tested on a spring-forward day.

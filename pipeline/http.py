@@ -63,6 +63,8 @@ class ApiClient:
         self._client = httpx.Client(
             transport=transport,
             timeout=config.REQUEST_TIMEOUT_SECONDS,
+            # NESO file downloads redirect to their storage host.
+            follow_redirects=True,
             headers={"User-Agent": config.USER_AGENT, "Accept": "application/json"},
         )
 
@@ -70,9 +72,9 @@ class ApiClient:
         """Join a path onto the base URL."""
         return f"{self.base_url}/{path.lstrip('/')}"
 
-    def get_json(self, path: str, params: dict[str, str] | None = None) -> Any:
-        """GET a JSON document, retrying transient failures with backoff."""
-        url = self.url(path)
+    def get(self, path: str, params: dict[str, str] | None = None) -> httpx.Response:
+        """GET a URL (or a path under the base URL), retrying transient failures with backoff."""
+        url = path if path.startswith("https://") else self.url(path)
         for attempt in range(1, self.max_retries + 1):
             self.limiter.wait()
             try:
@@ -81,7 +83,7 @@ class ApiClient:
                 reason = f"network error: {exc!r}"
             else:
                 if response.status_code == 200:
-                    return response.json()
+                    return response
                 if response.status_code not in RETRYABLE_STATUS:
                     raise ApiError(f"GET {url} -> HTTP {response.status_code}: {response.text[:200]}")
                 reason = f"HTTP {response.status_code}"
@@ -94,6 +96,14 @@ class ApiClient:
             )
             self._sleep(backoff)
         raise AssertionError("unreachable")
+
+    def get_json(self, path: str, params: dict[str, str] | None = None) -> Any:
+        """GET a JSON document."""
+        return self.get(path, params).json()
+
+    def get_text(self, path: str, params: dict[str, str] | None = None) -> str:
+        """GET a text document such as a CSV file."""
+        return self.get(path, params).text
 
     def close(self) -> None:
         """Close the underlying connection pool."""

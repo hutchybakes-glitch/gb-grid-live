@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from pipeline import backfill, config, export, snapshot
+from pipeline.ingest import neso_demand
 from pipeline.model import backtest
 
 log = logging.getLogger("pipeline.run")
@@ -70,6 +71,7 @@ def main(argv: list[str] | None = None) -> int:
         # An ingest failure is reported but does not stop the build: the
         # warehouse is rebuilt from whatever good raw data is already on disk.
         ingest_ok = backfill.main([]) == 0
+        ingest_ok = neso_demand.main() == 0 and ingest_ok
         ingest_ok = snapshot.main() == 0 and ingest_ok
 
     result = run_dbt(["build"])

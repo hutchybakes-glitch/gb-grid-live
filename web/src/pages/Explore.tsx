@@ -72,22 +72,23 @@ export default function Explore() {
     if (!d) return {}
     const ax = axisStyle()
     const slots = d.solar.filter((s) => s.season === 'summer').map((s) => s.local_time)
-    const pick = (season: string, key: 'avg_solar_mw' | 'avg_actual_gco2_kwh') =>
-      d.solar.filter((s) => s.season === season).map((s) => (key === 'avg_solar_mw' ? Math.round(s[key] / 100) / 10 : s[key]))
+    const gw = (mw: number | null) => (mw === null ? null : Math.round(mw / 100) / 10)
+    const pick = (season: string, key: 'avg_solar_mw' | 'avg_demand_mw' | 'avg_actual_gco2_kwh') =>
+      d.solar.filter((s) => s.season === season).map((s) => (key === 'avg_actual_gco2_kwh' ? s[key] : gw(s[key])))
     return {
       grid: { left: 48, right: 56, top: 48, bottom: 40 },
       legend: { top: 0, textStyle: { color: cssVar('--text-muted') } },
       tooltip: { trigger: 'axis' },
       xAxis: { type: 'category', data: slots, ...ax, splitLine: { show: false }, axisLabel: { ...ax.axisLabel, interval: 5 } },
       yAxis: [
-        { type: 'value', name: 'Solar, GW', min: 0, ...ax },
+        { type: 'value', name: 'GW', min: 0, ...ax },
         { type: 'value', name: 'gCO₂/kWh', min: 0, ...ax, splitLine: { show: false } },
       ],
       series: [
         { type: 'line', name: 'Solar, summer (GW)', data: pick('summer', 'avg_solar_mw'), showSymbol: false, areaStyle: { opacity: 0.15 }, lineStyle: { color: FUEL_COLOURS.solar, width: 2 }, itemStyle: { color: FUEL_COLOURS.solar } },
         { type: 'line', name: 'Solar, winter (GW)', data: pick('winter', 'avg_solar_mw'), showSymbol: false, lineStyle: { color: FUEL_COLOURS.solar, width: 2, type: 'dashed' }, itemStyle: { color: FUEL_COLOURS.solar } },
+        { type: 'line', name: 'Demand seen by grid, summer (GW)', data: pick('summer', 'avg_demand_mw'), showSymbol: false, lineStyle: { color: FUEL_COLOURS.wind, width: 2 }, itemStyle: { color: FUEL_COLOURS.wind } },
         { type: 'line', name: 'Intensity, summer', yAxisIndex: 1, data: pick('summer', 'avg_actual_gco2_kwh'), showSymbol: false, lineStyle: { color: cssVar('--text'), width: 2 }, itemStyle: { color: cssVar('--text') } },
-        { type: 'line', name: 'Intensity, winter', yAxisIndex: 1, data: pick('winter', 'avg_actual_gco2_kwh'), showSymbol: false, lineStyle: { color: cssVar('--text'), width: 2, type: 'dashed' }, itemStyle: { color: cssVar('--text') } },
       ],
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -101,6 +102,9 @@ export default function Explore() {
   const summerPeak = summer.reduce((a, b) => (b.avg_solar_mw > a.avg_solar_mw ? b : a))
   const summerNight = summer.find((s) => s.local_time === '03:00')!
   const summerMidday = summer.find((s) => s.local_time === summerPeak.local_time)!
+  const withDemand = summer.filter((s) => s.avg_demand_mw !== null)
+  const morningDemand = withDemand.find((s) => s.local_time === '08:00')?.avg_demand_mw ?? null
+  const middayDemand = summerMidday.avg_demand_mw
   const league = d.league.filter((l) => l.window_days === windowDays)
   const asOf = d.insights[0]?.as_of_utc
 
@@ -134,14 +138,18 @@ export default function Explore() {
             {whole(summerMidday.avg_actual_gco2_kwh)} against {whole(summerNight.avg_actual_gco2_kwh)} at 03:00
           </h2>
           <p className="caption">
-            Average national solar output (PV_Live estimate, GW, left) and measured carbon intensity (gCO₂/kWh, right) by UK time of day.
-            Summer is June to August; winter is December to February.
+            Average national solar output (PV_Live estimate), national demand as the grid operator sees it (NESO), both in GW (left), and
+            measured carbon intensity in summer (gCO₂/kWh, right), by UK time of day. Summer is June to August; winter is December to February.
           </p>
           <Chart option={solarOpt} label="Solar output and carbon intensity through the day, summer and winter" />
           <p style={{ marginTop: 8 }}>
             <strong>The hidden solar story.</strong> Most GB solar panels sit on roofs and small sites connected to local networks, not the
             national grid, so the grid operator cannot measure them directly. Sheffield Solar's PV_Live estimates their output. To the grid, this
-            solar looks like people using less electricity at midday. Record so far: <strong>{(d.solar_peak.mw / 1000).toFixed(1)} GW</strong>{' '}
+            solar looks like people using less electricity at midday
+            {middayDemand !== null && morningDemand !== null
+              ? `: on an average summer day, demand seen by the grid is ${(middayDemand / 1000).toFixed(1)} GW at ${summerPeak.local_time}, against ${(morningDemand / 1000).toFixed(1)} GW at 08:00`
+              : ''}
+            . Record solar output so far: <strong>{(d.solar_peak.mw / 1000).toFixed(1)} GW</strong>{' '}
             at {ukDateTime(d.solar_peak.at_utc)}.
           </p>
         </section>

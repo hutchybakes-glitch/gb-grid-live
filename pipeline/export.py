@@ -123,7 +123,7 @@ def export_explore(con: duckdb.DuckDBPyConnection) -> dict[str, Any]:
     return {
         "heatmap": query(con, "select local_month, local_hour, avg_actual_gco2_kwh, n from gold.gold_heatmap_hour_month"),
         "league": query(con, "select * from gold.gold_region_league order by window_days, rank"),
-        "solar": query(con, "select * from gold.gold_solar_profile order by season, slot"),
+        "solar": query(con, "select * from gold.gold_solar_vs_demand order by season, slot"),
         "solar_peak": query(
             con,
             """select arg_max(period_start_utc, generation_mw) as at_utc, max(generation_mw) as mw
