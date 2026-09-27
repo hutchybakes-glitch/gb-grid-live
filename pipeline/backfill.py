@@ -18,7 +18,7 @@ from pipeline import config
 from pipeline.chunks import Chunk, iter_chunks
 from pipeline.http import ApiError
 from pipeline.ingest import pvlive
-from pipeline.ingest.carbon_intensity import RANGE_ENDPOINTS, CarbonIntensityClient
+from pipeline.ingest.carbon_intensity import RANGE_ENDPOINTS, CarbonIntensityClient, max_days
 from pipeline.ingest.pvlive import PVLiveClient
 from pipeline.raw_paths import chunk_path, stale_siblings
 from pipeline.storage import EmptyResponseError, save_records, write_json_atomic
@@ -95,11 +95,11 @@ def run(start: datetime, end: datetime, sources: list[str] | None, raw_dir: Path
     unknown = set(sources or []) - set(fetchers)
     if unknown:
         raise SystemExit(f"unknown sources: {sorted(unknown)}; choose from {sorted(fetchers)}")
-    chunks = list(iter_chunks(start, end))
     stats = BackfillStats()
     for source, fetch in fetchers.items():
         if sources and source not in sources:
             continue
+        chunks = list(iter_chunks(start, end, days=max_days(source)))
         log.info("== %s: %d chunks ==", source, len(chunks))
         backfill_source(source, fetch, chunks, raw_dir, stats)
     return stats

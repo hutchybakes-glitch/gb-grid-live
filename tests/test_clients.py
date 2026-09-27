@@ -7,7 +7,7 @@ import httpx
 import pytest
 
 from pipeline.ingest import pvlive
-from pipeline.ingest.carbon_intensity import CarbonIntensityClient, range_path
+from pipeline.ingest.carbon_intensity import CarbonIntensityClient, max_days, range_path
 from pipeline.ingest.pvlive import PVLiveClient
 from tests.conftest import load_fixture
 
@@ -16,11 +16,19 @@ START = datetime(2023, 1, 1, tzinfo=UTC)
 
 
 def test_ci_range_path_format_and_limit() -> None:
-    assert range_path("ci_regional", START, datetime(2023, 1, 15, tzinfo=UTC)) == (
-        "regional/intensity/2023-01-01T00:00Z/2023-01-15T00:00Z"
+    assert range_path("ci_generation", START, datetime(2023, 1, 15, tzinfo=UTC)) == (
+        "generation/2023-01-01T00:00Z/2023-01-15T00:00Z"
     )
     with pytest.raises(ValueError):
         range_path("ci_national", START, datetime(2023, 1, 15, 0, 30, tzinfo=UTC))
+
+
+def test_ci_regional_limit_is_13_days() -> None:
+    # The live API answers HTTP 400 to an exact 14-day regional window.
+    assert max_days("ci_regional") == 13
+    with pytest.raises(ValueError):
+        range_path("ci_regional", START, datetime(2023, 1, 15, tzinfo=UTC))
+    assert range_path("ci_regional", START, datetime(2023, 1, 14, tzinfo=UTC))
 
 
 @pytest.mark.parametrize(

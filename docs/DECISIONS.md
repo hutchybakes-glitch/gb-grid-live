@@ -36,3 +36,9 @@ Each API client has its own ≥1 s limiter and requests run one after another, s
 
 ## 2026-09-27 — Only httpx and pytest pinned for Phase 1
 DuckDB, dbt, pandas and the modelling libraries will be added in the phase that first needs them, keeping Phase 1 installs small and quick.
+
+## 2026-09-27 — Regional chunks are 13 days, not 14 (found during backfill)
+- **What happened:** during the first full backfill, all 98 regional chunks failed with HTTP 400: "The date range you have specified is greater than 14 days". An exact 14-day window (`2023-01-01T00:00Z/2023-01-15T00:00Z`) is accepted by `/intensity` and `/generation` but rejected by `/regional/intensity`. Probes showed that any window up to `…/2023-01-14T23:30Z` works.
+- **Decision:** regional uses 13-day chunks (`REGIONAL_CHUNK_DAYS`). All other sources keep 14 days, so their completed files stay valid. This corrects DATA.md's "assume the same 14-day limit": the regional limit is effectively under 14 days.
+- **Options considered:** 13 days for every source (simpler, but it would have meant refetching about 200 completed national and generation chunks); ending windows at 23:30 (fiddly, and not the same chunk scheme as the other sources).
+- The fixed failure mode worked as designed: nothing was written, the errors were logged, and the rerun fetched only the regional chunks.

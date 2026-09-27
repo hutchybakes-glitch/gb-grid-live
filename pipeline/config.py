@@ -15,6 +15,9 @@ BACKFILL_START: datetime = datetime(2023, 1, 1, tzinfo=timezone.utc)
 # The Carbon Intensity API rejects ranges over 14 days; we reuse the same
 # window for PV_Live so both sources share one resumable chunk scheme.
 MAX_CHUNK_DAYS: int = 14
+# The regional endpoint rejects an exact 14-day window as "greater than 14
+# days" (the national one accepts it), so regional uses 13-day chunks.
+REGIONAL_CHUNK_DAYS: int = 13
 
 # Politeness: at most one request per second across the whole process.
 MIN_SECONDS_BETWEEN_REQUESTS: float = 1.0

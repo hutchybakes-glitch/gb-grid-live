@@ -25,10 +25,15 @@ def fmt(moment: datetime) -> str:
     return moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
 
 
+def max_days(endpoint: str) -> int:
+    """Longest window the API accepts for ``endpoint`` (checked against the live API)."""
+    return config.REGIONAL_CHUNK_DAYS if endpoint == "ci_regional" else config.MAX_CHUNK_DAYS
+
+
 def range_path(endpoint: str, start: datetime, end: datetime) -> str:
-    """Build a ranged path, refusing anything over the API's 14-day limit."""
-    if end - start > timedelta(days=config.MAX_CHUNK_DAYS):
-        raise ValueError(f"range {start}..{end} exceeds {config.MAX_CHUNK_DAYS} days")
+    """Build a ranged path, refusing anything over the endpoint's limit."""
+    if end - start > timedelta(days=max_days(endpoint)):
+        raise ValueError(f"range {start}..{end} exceeds {max_days(endpoint)} days for {endpoint}")
     return RANGE_ENDPOINTS[endpoint].format(start=fmt(start), end=fmt(end))
 
 
