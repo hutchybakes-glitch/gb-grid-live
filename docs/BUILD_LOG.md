@@ -236,3 +236,34 @@ npx playwright test                    ->  18 passed
 
 ### Questions for Samuel
 - Should I add NESO's national demand data (NESO Data Portal, open licence, no key) so the hidden-solar chart can show demand, as SPEC.md describes? I used solar vs intensity for now.
+
+
+---
+
+## Session 2 (cont.) — Phase 5: automate and publish (IN PROGRESS, BLOCKED ON PUSH)
+
+Samuel created https://github.com/hutchybakes-glitch/gb-grid-live (empty; Pages source is GitHub Actions; workflow permissions read/write) and asked me to add it as the remote, push, set up the daily pipeline and deploy.
+
+### What was built
+- `.github/workflows/daily.yml`: runs daily at 05:30 UTC, on manual dispatch, and on push to `main`. Steps: Python tests → `pipeline.run` (ingest, snapshot, dbt build, model, export) → commit new snapshots to the `snapshots` branch → save the raw cache → Vitest, build, Playwright → deploy to GitHub Pages.
+- **Storage between runs:** raw API chunks are kept in the Actions cache (re-fetchable; if evicted, the resumable backfill refetches them). **Forecast snapshots are kept on a `snapshots` branch** because they can never be re-downloaded.
+- **Snapshots are now gzipped** (`.json.gz`; regional 759 KB → 41 KB, about 15 MB a year). `storage.read_json` reads either format; the bronze glob matches both. I converted the 6 local snapshots and confirmed dbt reads them (3 captures: national 291 rows, regional 5,238).
+- README rewritten (3-sentence summary, live URL, screenshots, pipeline sketch, setup); `docs/WALKTHROUGH.md` (2-minute script); `docs/screenshots/`.
+- Local branch renamed `master` → `main`; orphan branch `snapshots` created with the existing snapshots.
+- `learning/storage.py` and `learning/snapshot.py` synced for gzip.
+
+### Notes
+- One snapshot (`…T1859Z`) was created by the `pipeline.run` call that Samuel interrupted earlier; it evidently got as far as the snapshot step before being stopped. It's a genuine capture, so I kept it.
+
+### BLOCKED: push rejected
+```
+git push -u origin snapshots
+remote: Permission to hutchybakes-glitch/gb-grid-live.git denied to sammyhutch.
+fatal: ... The requested URL returned error: 403
+```
+The GitHub credentials stored on this machine belong to the account `sammyhutch`, which has no write access to the `hutchybakes-glitch` repository. Nothing has been pushed. The remote `origin` is configured locally.
+
+### Phase 5 acceptance checks
+- [ ] GitHub Actions run succeeds on a schedule and deploys the site: **not yet run (blocked on push).**
+- [ ] Public URL loads in under 2 seconds: **not yet measurable.**
+- [x] README explains the project in 3 sentences, with screenshots and setup steps (done locally; not yet on GitHub).

@@ -87,3 +87,9 @@ DuckDB, dbt, pandas and the modelling libraries will be added in the phase that 
 - **"Solar vs demand" became "solar vs intensity" (`gold_solar_profile`).** No demand source is in DATA.md, and adding NESO demand data would be a new source, so it's logged as a question. The page still tells the hidden-solar story in words and shows the midday intensity dip in summer.
 - **Insight cards:** `gold_insights` computes every number (cleanest vs dirtiest hour over the last 365 days, year-on-year change, cleanest vs dirtiest region over 365 days). The site only fills them into sentence templates; region names come from `dim_region`.
 - **Region league uses forecasts** (no regional actuals exist), and the page says so.
+
+## 2026-09-27 — Phase 5 decisions
+- **Raw API chunks live in the GitHub Actions cache; forecast snapshots live on a `snapshots` git branch.** Raw data (581 MB) can be refetched, so a cache that may be evicted is acceptable. Snapshots cannot be refetched, so they need durable storage. A separate branch keeps daily bot commits out of `main` history. Rejected: committing raw data (too big); a daily artifact (expires after 90 days).
+- **Snapshots are gzipped** (about 18x smaller) so the snapshots branch grows by about 15 MB a year.
+- **The workflow fails, and does not deploy, if ingestion or any dbt test fails**, so Pages keeps serving the last good build instead of partial data.
+- **Schedule: 05:30 UTC daily.** It runs before the morning, so the day-ahead snapshot captures a full 48 h from early morning.
