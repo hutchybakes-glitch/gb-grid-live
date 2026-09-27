@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import Layout from './components/Layout'
 import { PAGES, pageFromHash, type PageId } from './pages'
 import Now from './pages/Now'
-import Placeholder from './pages/Placeholder'
+import Explore from './pages/Explore'
+import How from './pages/How'
 import Plan from './pages/Plan'
+import Trust from './pages/Trust'
 
 // Hash routing: works on any static host (GitHub Pages included) with no server rewrites.
 function usePage(): PageId {
@@ -30,9 +32,9 @@ export default function App() {
     <Layout page={page}>
       {page === 'now' && <Now />}
       {page === 'plan' && <Plan />}
-      {page === 'trust' && <Placeholder title="Can you trust the forecast?" />}
-      {page === 'explore' && <Placeholder title="Explore" />}
-      {page === 'how' && <Placeholder title="How it works" />}
+      {page === 'trust' && <Trust />}
+      {page === 'explore' && <Explore />}
+      {page === 'how' && <How />}
     </Layout>
   )
 }

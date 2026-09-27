@@ -11,3 +11,4 @@ These files are for reading only; the real code lives in `pipeline/`. They are r
 | `pvlive.py` | `pipeline/ingest/pvlive.py` | Reading an API's column-list table format safely |
 | `storage.py` | `pipeline/storage.py` | Atomic writes and never saving empty data |
 | `snapshot.py` | `pipeline/snapshot.py` | Capturing forecast "vintages" with a timestamp |
+| `features.py` | `pipeline/model/features.py` | Building model inputs without peeking at the future (no leakage) |

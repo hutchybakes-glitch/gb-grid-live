@@ -2,7 +2,7 @@
 """Resumable, idempotent backfill of raw data for both sources.
 
 Usage (PowerShell):
-    python -m pipeline.backfill                      # 2023-01-01 to today, all sources
+    python -m pipeline.backfill                      # 2023-01-01 to now, all sources
     python -m pipeline.backfill --start 2024-01-01 --sources ci_national
 """
 # Allows modern type-hint syntax.
@@ -16,8 +16,8 @@ import logging
 import sys
 # dataclass makes a simple value-holding class; field sets up a default empty list safely.
 from dataclasses import dataclass, field
-# Dates, times and UTC.
-from datetime import datetime, timezone
+# Dates, lengths of time, and UTC.
+from datetime import datetime, timedelta, timezone
 # Path represents a file or folder location in a way that works on Windows and Linux.
 from pathlib import Path
 # Type-hint helpers.
@@ -25,8 +25,8 @@ from typing import Any, Callable
 
 # Shared settings.
 from pipeline import config
-# Our date-range chopper.
-from pipeline.chunks import Chunk, iter_chunks
+# Our date-range chopper, and the helper that rounds a time down to the half-hour.
+from pipeline.chunks import Chunk, floor_half_hour, iter_chunks
 # The error raised when an API gives up after retries.
 from pipeline.http import ApiError
 # The PV_Live module (for helper functions like pes_ids).
@@ -72,12 +72,29 @@ def parse_date(text: str) -> datetime:
     return datetime.strptime(text, "%Y-%m-%d").replace(tzinfo=timezone.utc)
 
 
-# Work out today's midnight in UTC.
-def today_midnight_utc() -> datetime:
+# Work out where the backfill should stop by default.
+def default_end() -> datetime:
     # The docstring.
-    """Midnight UTC today: the backfill stops here so every chunk covers whole days."""
-    # Take "now" and zero out the time part.
-    return datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    """The start of the current half-hour: fetch everything published so far."""
+    # Take "now" in UTC and round it down to the half-hour.
+    return floor_half_hour(datetime.now(timezone.utc))
+
+
+# Decide whether one chunk needs downloading on this run.
+def needs_fetch(path: Path, chunk: Chunk, refresh_after: datetime | None) -> bool:
+    # The docstring explains the two reasons to fetch.
+    """A chunk is fetched if it is missing, or if it ends recently enough to still change.
+
+    Recent periods gain their ``actual`` values (and PV_Live revises estimates)
+    after first publication, so chunks ending after ``refresh_after`` are
+    refetched on every run until they are safely in the past.
+    """
+    # No file yet: definitely fetch it.
+    if not path.exists():
+        # Yes, fetch.
+        return True
+    # File exists: fetch again only if the chunk ends inside the "still changing" window.
+    return refresh_after is not None and chunk.end > refresh_after
 
 
 # Build a lookup table: source name -> function that downloads one chunk of that source.
@@ -109,18 +126,28 @@ def build_fetchers(ci: CarbonIntensityClient, pv: PVLiveClient, raw_dir: Path) -
 
 # Download every missing chunk for one source.
 def backfill_source(
-    # The source name, a download function, the list of chunks, where to save, and the scoreboard.
-    source: str, fetch: Fetcher, chunks: list[Chunk], raw_dir: Path, stats: BackfillStats
+    # The source name.
+    source: str,
+    # A function that downloads one chunk.
+    fetch: Fetcher,
+    # The list of chunks.
+    chunks: list[Chunk],
+    # Where to save.
+    raw_dir: Path,
+    # The scoreboard.
+    stats: BackfillStats,
+    # Chunks ending after this moment are refetched even if already saved.
+    refresh_after: datetime | None = None,
 # Returns nothing (results go into stats).
 ) -> None:
     # The docstring.
-    """Fetch every missing chunk of one source, skipping those already on disk."""
+    """Fetch missing (and recent) chunks of one source, skipping the rest."""
     # Go through the chunks in date order.
     for chunk in chunks:
         # Work out where this chunk's file should be.
         path = chunk_path(source, chunk, raw_dir)
-        # If it's already there, a previous run finished it: this is the "resume" trick.
-        if path.exists():
+        # If it's already there and not recent, a previous run finished it: this is the "resume" trick.
+        if not needs_fetch(path, chunk, refresh_after):
             # Count it as skipped.
             stats.skipped += 1
             # Move on to the next chunk without calling the API.
@@ -156,9 +183,23 @@ def backfill_source(
 
 
 # Run the backfill for a date range and a set of sources.
-def run(start: datetime, end: datetime, sources: list[str] | None, raw_dir: Path = config.RAW_DIR) -> BackfillStats:
+def run(
+    # First moment to fetch.
+    start: datetime,
+    # Stop before this moment.
+    end: datetime,
+    # Which sources (None means all).
+    sources: list[str] | None,
+    # Where raw files live.
+    raw_dir: Path = config.RAW_DIR,
+    # How many recent days to refetch every run (2 by default).
+    refresh_days: int = config.REFRESH_RECENT_DAYS,
+# Returns the scoreboard.
+) -> BackfillStats:
     # The docstring.
     """Backfill ``sources`` (all if None) for [start, end) and return run statistics."""
+    # Anything ending after this moment counts as "recent" and gets refetched.
+    refresh_after = end - timedelta(days=refresh_days)
     # Create one client per API.
     ci, pv = CarbonIntensityClient(), PVLiveClient()
     # Build the source -> download-function table.
@@ -181,8 +222,8 @@ def run(start: datetime, end: datetime, sources: list[str] | None, raw_dir: Path
         chunks = list(iter_chunks(start, end, days=max_days(source)))
         # Log a header line for this source.
         log.info("== %s: %d chunks ==", source, len(chunks))
-        # Download its missing chunks.
-        backfill_source(source, fetch, chunks, raw_dir, stats)
+        # Download its missing and recent chunks.
+        backfill_source(source, fetch, chunks, raw_dir, stats, refresh_after)
     # Return the scoreboard.
     return stats
 
@@ -195,8 +236,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     # --start: first day to fetch (default 2023-01-01).
     parser.add_argument("--start", type=parse_date, default=config.BACKFILL_START)
-    # --end: stop before this day (default: today at midnight UTC).
-    parser.add_argument("--end", type=parse_date, default=None, help="exclusive; default today 00:00 UTC")
+    # --end: stop before this day (default: the current half-hour).
+    parser.add_argument("--end", type=parse_date, default=None, help="exclusive; default: the current half-hour")
     # --sources: optional list of source names to fetch.
     parser.add_argument("--sources", nargs="*", default=None)
     # Read the options the user typed.
@@ -204,7 +245,7 @@ def main(argv: list[str] | None = None) -> int:
     # Turn on INFO-level logging with timestamps.
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     # Do the work.
-    stats = run(args.start, args.end or today_midnight_utc(), args.sources)
+    stats = run(args.start, args.end or default_end(), args.sources)
     # Print a one-line summary.
     log.info(
         # The template.

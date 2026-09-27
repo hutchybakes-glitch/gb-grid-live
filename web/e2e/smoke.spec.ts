@@ -64,3 +64,16 @@ test('no horizontal scroll at the current viewport', async ({ page }) => {
     expect(overflow, `${p.hash} overflows by ${overflow}px`).toBeLessThanOrEqual(0)
   }
 })
+
+test('Trust, Explore and How it works show computed content', async ({ page }) => {
+  await page.goto('./#/trust')
+  await expect(page.getByRole('heading', { level: 2 }).first()).toContainText(/out by \d+\.\d gCO₂\/kWh/)
+  await expect(page.getByText(/Snapshots collected so far: \d+ day/)).toBeVisible()
+  await page.goto('./#/explore')
+  await expect(page.locator('section.card').first()).toContainText(/\d/)
+  await page.getByRole('button', { name: 'Last 365 days' }).click()
+  await expect(page.locator('tbody tr')).toHaveCount(14)
+  await page.goto('./#/how')
+  await expect(page.getByRole('heading', { name: /\d+ automated data checks/ })).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'Carbon Intensity: national' })).toBeVisible()
+})

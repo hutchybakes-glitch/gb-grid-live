@@ -43,7 +43,7 @@ def summarise_tests(result: Any) -> dict[str, Any]:
     tests = []
     for r in result.result or []:
         node = r.node
-        if node.resource_type != "test":
+        if str(node.resource_type) not in ("test", "unit_test"):
             continue
         tests.append({"name": node.name, "status": str(r.status), "failures": r.failures})
     counts: dict[str, int] = {}

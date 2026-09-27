@@ -184,3 +184,55 @@ Samuel asked for Phases 2–4 to run back to back, stopping only if blocked or w
 1. The tile map instead of real boundaries (DECISIONS.md). It works well for clicking and accessibility, but it's a design choice you may want to change.
 2. The kWh assumptions on the Plan page (EV 28 kWh, washing 1 kWh, dishwasher 1.2 kWh).
 3. Wording of the plain-English sentence (`web/src/lib/sentence.ts`).
+
+
+---
+
+## Session 2 (cont.) — Phase 4: Trust, Explore, the model and How it works
+
+### What was built
+- **dbt:** `silver_forecast_errors`, `gold_forecast_accuracy` (overall, month, UK hour, wind regime), `gold_snapshot_accuracy` (true lead-time accuracy from snapshots), `gold_heatmap_hour_month`, `gold_region_league` (30/365 days), `gold_solar_profile`, `gold_insights`. There are now 83 dbt nodes, including 55 data tests (one warn-only) and 3 unit tests; the latest build reports `{pass: 57, warn: 1}`.
+- **`pipeline/model/`:** `metrics.py` (MAE/RMSE/bias), `features.py` (leakage-safe features), `backtest.py` (rolling-origin LightGBM backtest for 1 h and 24 h horizons, writing `gold.gold_model_backtest` and `gold.gold_model_features`). `pipeline.run` now does ingest → snapshot → dbt build → backtest → export.
+- **Export:** adds `trust.json` (22 KB) and `explore.json` (34 KB).
+- **Site:** Trust page (headline MAE, the vintage caveat and snapshot count, monthly error, error by hour, wind regimes, model vs official with a 24 h/1 h toggle, feature importance, and a limitations paragraph); Explore page (3 computed insight cards, hour × month heatmap, the hidden-solar chart and story, region league 30/365 days); How it works (pipeline diagram, live data quality table and test counts from `gold_pipeline_health`, gap list, model card, links to the repo, DECISIONS and BUILD_LOG, and a "built with Claude Code" section).
+- **Tests:** 7 new pytest tests (MAE known values, NaN refusal, leakage poisoning at both horizons, the gap-shift check, rolling-origin train/test split, fold months), for 41 pytest tests in total. 1 new dbt unit test (MAE) and 1 new Playwright test (18 in total).
+- **learning/:** `backfill.py` synced with the Phase 2 refresh logic; new `features.py`.
+
+### What broke and how it was fixed
+- **My hand-written expected values in the MAE dbt unit test were wrong** (I wrote 3.3% for MAE as a share of the mean; the correct value is 10.0% because the mean actual is 100). The test failed and the model was right. I fixed the expectation.
+- **dbt's failure message crashed on the Windows console encoding** (cp1252 can't print "→"). `pipeline.run` now reconfigures stdout and stderr to UTF-8.
+- **My synthetic data in the rolling-origin test** ended on 29 January, so January had 29 days, not 31. I extended the test data.
+- **The test summary skipped dbt unit tests;** it now counts both `test` and `unit_test` nodes.
+- **The Explore subtitle said "nearly four years"**, a typed-in number; I replaced it with "since January 2023".
+
+### Phase 4 acceptance checks
+- [x] **Trust page shows official forecast error with a correct MAE calculation (unit-tested) and explains vintages.**
+  - dbt unit test `forecast_accuracy_mae_is_mean_absolute_error` (errors +10, −20, 0 → MAE 10, bias −3.33, RMSE 12.91, plus per-hour and per-wind groups): **pass**.
+  - pytest `test_mae_known_values` (same example via `metrics.mae/bias/rmse`): **pass**.
+  - The page states "On average the official forecast is out by 9.8 gCO₂/kWh (7.4% of the typical value)" over 65,387 half-hours. It has a caveat section explaining final forecast vs day-ahead vintages and shows "Snapshots collected so far: 1 day" (Playwright asserts both).
+- [x] **Model backtest uses rolling-origin evaluation with no leakage; results and baseline shown side by side.**
+  - pytest `test_no_feature_uses_information_after_the_cutoff[2]` and `[48]`: every actual and solar value after a cut-off is set to 1e9, and features for periods ≤ cut-off + horizon are unchanged. **Pass.** `test_missing_period_does_not_shift_wrong_row`: **pass**. `test_rolling_origin_trains_only_on_the_past`: train rows = all rows before 2024-01-01, test = the 1,488 January half-hours. **Pass.**
+  - Real backtest, 33 monthly folds (2024-01 to 2026-09), 47,963 test half-hours:
+    ```
+    1h_ahead  overall MAE: official 9.81 | model 5.67 | official+recent error 8.85
+    24h_ahead overall MAE: official 9.81 | model 8.16 | official+recent error 11.24
+    ```
+    The model beats the official forecast in 33/33 months at both horizons. The Trust page shows the monthly lines and a side-by-side table with both baselines, plus a limitations paragraph (see DECISIONS: final-forecast caveat).
+- [x] **Every number in insight cards is computed from gold tables, not typed.** All values come from `gold.gold_insights` (e.g. `cleanest_hour 12.0 | 103.56 | 19.0 | 153.31`, `year_on_year 124.36 | 132.69`, `region_gap 2 | 7.2 | 7 | 251.4`); the site computes % and ratios from those and looks up region names in `regions.json`. dbt tests: `not_null` on `value_1`/`value_2` and `unique` on `card`. Chart titles on Explore and Trust are also computed (e.g. "Cleanest on average: Jun around 13:00 (88 gCO₂/kWh)").
+- [x] **How it works page shows live pipeline health from `gold_pipeline_health`.** The table rows come from `pipeline_health.json` (exported from `gold.gold_pipeline_health`) with test counts from the latest `dbt build`. Playwright asserts the "N automated data checks" heading and the "Carbon Intensity: national" row.
+
+Full runs:
+```
+python -m pipeline.run --skip-ingest   ->  Done. PASS=82 WARN=1 ERROR=0 SKIP=0 TOTAL=83; exports written; exit=0
+python -m pytest -q                    ->  41 passed
+npm test                               ->  7 passed
+npx playwright test                    ->  18 passed
+```
+
+### For Samuel to review (Phase 4)
+1. **The model claims and caveats** on the Trust page and in the model card. The improvement is large; I've been explicit that it's measured against the *final* forecast.
+2. **Solar vs intensity instead of solar vs demand** (no demand source). See the question below.
+3. The **wind thresholds** (20% / 40%) and the insight-card wording.
+
+### Questions for Samuel
+- Should I add NESO's national demand data (NESO Data Portal, open licence, no key) so the hidden-solar chart can show demand, as SPEC.md describes? I used solar vs intensity for now.

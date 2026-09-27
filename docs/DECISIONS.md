@@ -74,3 +74,16 @@ DuckDB, dbt, pandas and the modelling libraries will be added in the phase that 
 - **Playwright runs against the production build**, with a second mode (`STATIC_SERVER=python`) using `python -m http.server` to prove the site works from a plain static file server.
 - **`pipeline.run` exports JSON only if `dbt build` succeeded**, so a failing data test can never publish bad data to the site.
 - **Site data JSON (`web/public/data/`) is committed**, so a fresh clone builds and runs without the warehouse.
+
+
+## 2026-09-27 — Phase 4 decisions
+- **Error sign:** error = actual − forecast everywhere (positive means the forecast ran low). MAE, bias and RMSE are defined once in `pipeline/model/metrics.py` and match the SQL in `gold_forecast_accuracy` (both unit-tested with the same hand-worked example).
+- **Wind regimes use fixed thresholds** on wind's share of national generation: low < 20%, medium 20–40%, high ≥ 40%. They are easier to explain than terciles. Periods without a generation mix are "unknown" and not shown.
+- **Model target is the forecast error, not the actual**, so the model learns only a correction and the official forecast remains the backbone. LightGBM, fixed hyperparameters (no tuning, so there is nothing to overfit in the backtest).
+- **Two horizons, 1 h and 24 h ahead.** Every feature except the forecast for t and calendar fields is shifted by at least the horizon, on a complete half-hour index, so a gap cannot pull in a wrong row. This is unit-tested by poisoning all values after a cut-off.
+- **Rolling-origin backtest:** expanding window, one fold per calendar month from 2024-01, training only on data before the month. The overall score is period-weighted (identical to MAE over all test periods). I added a second baseline, "official + latest known error", so the model has to beat something smarter than the raw forecast.
+- **Honesty caveat, stated on the site:** history holds only NESO's final forecast, whose issue time is unknown and may be shortly before the period. The comparison is therefore "model vs the same final forecast", with fair inputs but not proof of day-ahead skill. The 1 h model also assumes recent actuals arrive within an hour, which isn't verified. Daily snapshots (`gold_snapshot_accuracy`) will measure genuine lead-time accuracy as they build up.
+- **Model outputs are written by Python to `gold.gold_model_backtest` and `gold.gold_model_features`**, not built by dbt, because dbt-duckdb Python models would complicate the Windows setup. They're rebuilt on every `pipeline.run`, after `dbt build` and before the export.
+- **"Solar vs demand" became "solar vs intensity" (`gold_solar_profile`).** No demand source is in DATA.md, and adding NESO demand data would be a new source, so it's logged as a question. The page still tells the hidden-solar story in words and shows the midday intensity dip in summer.
+- **Insight cards:** `gold_insights` computes every number (cleanest vs dirtiest hour over the last 365 days, year-on-year change, cleanest vs dirtiest region over 365 days). The site only fills them into sentence templates; region names come from `dim_region`.
+- **Region league uses forecasts** (no regional actuals exist), and the page says so.
