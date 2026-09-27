@@ -1,6 +1,6 @@
 """Run the whole pipeline end to end.
 
-    python -m pipeline.run                 # ingest, snapshot, dbt build, export JSON
+    python -m pipeline.run                 # ingest, snapshot, dbt build, model backtest, export JSON
     python -m pipeline.run --skip-ingest   # rebuild from raw files only (no API calls)
 """
 from __future__ import annotations
@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from pipeline import backfill, config, export, snapshot
+from pipeline.model import backtest
 
 log = logging.getLogger("pipeline.run")
 
@@ -56,6 +57,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--skip-ingest", action="store_true", help="do not call the APIs")
     args = parser.parse_args(argv)
+    # dbt prints non-ASCII characters (e.g. arrows in test diffs); the default
+    # Windows console encoding cannot show them and would crash the run.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
@@ -76,6 +82,7 @@ def main(argv: list[str] | None = None) -> int:
         # Never publish site data from a build whose tests failed.
         log.error("dbt build failed; site data NOT exported")
         return 1
+    backtest.main()
     export.main(read_only=False)
     return 0 if ingest_ok else 1
 

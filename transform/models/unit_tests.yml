@@ -24,3 +24,21 @@ unit_tests:
     expect:
       rows:
         - {period_start_utc: "2024-06-01 12:00:00", forecast_gco2_kwh: 150, actual_gco2_kwh: 140}
+
+  - name: forecast_accuracy_mae_is_mean_absolute_error
+    description: "Errors of +10, -20 and 0 give MAE 10, bias -3.33, RMSE sqrt(500/3) = 12.91."
+    model: gold_forecast_accuracy
+    given:
+      - input: ref('silver_forecast_errors')
+        rows:
+          - {period_start_utc: "2024-06-01 12:00:00", forecast_gco2_kwh: 100, actual_gco2_kwh: 110, error_gco2_kwh: 10, abs_error_gco2_kwh: 10, local_date: "2024-06-01", local_hour: 13, local_month: 6, wind_perc: 10, wind_regime: "low wind (<20%)"}
+          - {period_start_utc: "2024-06-01 12:30:00", forecast_gco2_kwh: 120, actual_gco2_kwh: 100, error_gco2_kwh: -20, abs_error_gco2_kwh: 20, local_date: "2024-06-01", local_hour: 13, local_month: 6, wind_perc: 50, wind_regime: "high wind (40%+)"}
+          - {period_start_utc: "2024-06-01 13:00:00", forecast_gco2_kwh: 90, actual_gco2_kwh: 90, error_gco2_kwh: 0, abs_error_gco2_kwh: 0, local_date: "2024-06-01", local_hour: 14, local_month: 6, wind_perc: 50, wind_regime: "high wind (40%+)"}
+    expect:
+      rows:
+        - {grouping: overall, group_key: all, n: 3, mae: 10.0, bias: -3.33, rmse: 12.91, mae_pct_of_mean: 10.0}
+        - {grouping: month, group_key: "2024-06", n: 3, mae: 10.0, bias: -3.33, rmse: 12.91, mae_pct_of_mean: 10.0}
+        - {grouping: local_hour, group_key: "13", n: 2, mae: 15.0, bias: -5.0, rmse: 15.81, mae_pct_of_mean: 14.3}
+        - {grouping: local_hour, group_key: "14", n: 1, mae: 0.0, bias: 0.0, rmse: 0.0, mae_pct_of_mean: 0.0}
+        - {grouping: wind_regime, group_key: "low wind (<20%)", n: 1, mae: 10.0, bias: 10.0, rmse: 10.0, mae_pct_of_mean: 9.1}
+        - {grouping: wind_regime, group_key: "high wind (40%+)", n: 2, mae: 10.0, bias: -10.0, rmse: 14.14, mae_pct_of_mean: 10.5}

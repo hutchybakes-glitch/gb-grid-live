@@ -103,11 +103,43 @@ def export_pipeline_health(con: duckdb.DuckDBPyConnection) -> dict[str, Any]:
     }
 
 
+def export_trust(con: duckdb.DuckDBPyConnection) -> dict[str, Any]:
+    """Official forecast accuracy, snapshot accuracy and the model backtest."""
+    return {
+        "accuracy": query(con, "select * from gold.gold_forecast_accuracy order by grouping, group_key"),
+        "snapshot_accuracy": query(con, "select * from gold.gold_snapshot_accuracy order by min_lead_hours"),
+        "snapshot_days": query(
+            con,
+            """select count(distinct cast(captured_at as date)) as days, min(captured_at) as first, max(captured_at) as last
+               from bronze.bronze_forecast_snapshots where scope = 'national'""",
+        )[0],
+        "backtest": query(con, "select * exclude (built_at_utc) from gold.gold_model_backtest order by horizon, fold"),
+        "features": query(con, "select * from gold.gold_model_features order by horizon, importance_share desc"),
+    }
+
+
+def export_explore(con: duckdb.DuckDBPyConnection) -> dict[str, Any]:
+    """Heatmap, region league, solar profile and insight numbers."""
+    return {
+        "heatmap": query(con, "select local_month, local_hour, avg_actual_gco2_kwh, n from gold.gold_heatmap_hour_month"),
+        "league": query(con, "select * from gold.gold_region_league order by window_days, rank"),
+        "solar": query(con, "select * from gold.gold_solar_profile order by season, slot"),
+        "solar_peak": query(
+            con,
+            """select arg_max(period_start_utc, generation_mw) as at_utc, max(generation_mw) as mw
+               from silver.silver_pvlive where area_id = 'gsp0'""",
+        )[0],
+        "insights": query(con, "select * from gold.gold_insights order by card"),
+    }
+
+
 EXPORTS: dict[str, Callable[[duckdb.DuckDBPyConnection], Any]] = {
     "regions.json": export_regions,
     "region_now.json": export_region_now,
     "region_48h.json": export_region_48h,
     "pipeline_health.json": export_pipeline_health,
+    "trust.json": export_trust,
+    "explore.json": export_explore,
 }
 
 

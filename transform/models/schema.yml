@@ -128,6 +128,45 @@ models:
     data_tests:
       - unique_combination:
               arguments: {columns: [region_id, period_start_utc]}
+  - name: gold_forecast_accuracy
+    description: Official final-forecast accuracy (MAE, bias, RMSE) overall and by month, local hour and wind regime.
+    data_tests:
+      - unique_combination:
+              arguments: {columns: [grouping, group_key]}
+    columns:
+      - name: mae
+        data_tests: [not_null]
+  - name: gold_snapshot_accuracy
+    description: Ahead-of-time accuracy from this project's own fw48h snapshots, by lead time.
+  - name: gold_heatmap_hour_month
+    description: Average national actual intensity by UK local hour x month.
+    data_tests:
+      - unique_combination:
+              arguments: {columns: [local_month, local_hour]}
+  - name: gold_region_league
+    description: Regions ranked by average forecast intensity over 30 and 365 days.
+    data_tests:
+      - unique_combination:
+              arguments: {columns: [window_days, region_id]}
+  - name: gold_solar_profile
+    description: Average national solar (PV_Live) and intensity by local half-hour, summer vs winter.
+    data_tests:
+      - unique_combination:
+              arguments: {columns: [season, slot]}
+  - name: gold_insights
+    description: Computed numbers behind the Explore page insight cards.
+    columns:
+      - name: card
+        data_tests: [unique, not_null]
+      - name: value_1
+        data_tests: [not_null]
+      - name: value_2
+        data_tests: [not_null]
+  - name: silver_forecast_errors
+    description: National periods with both forecast and actual; error = actual - forecast.
+    columns:
+      - name: period_start_utc
+        data_tests: [unique, not_null]
 
 seeds:
   - name: pes_region_map
