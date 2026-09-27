@@ -3,7 +3,7 @@
 with national as (
     select filename, captured_at, unnest(data) as d
     from read_json(
-        '{{ env_var("GBGL_RAW_DIR", "../data/raw") | replace("\\", "/") }}/forecast_snapshots/*/fw48h_national_*.json',
+        '{{ env_var("GBGL_RAW_DIR", "../data/raw") | replace("\\", "/") }}/forecast_snapshots/*/fw48h_national_*.json*',
         columns = {captured_at: 'VARCHAR', data: 'STRUCT("from" VARCHAR, "to" VARCHAR, intensity STRUCT(forecast INTEGER, "index" VARCHAR))[]'},
         filename = true
     )
@@ -11,7 +11,7 @@ with national as (
 regional_periods as (
     select filename, captured_at, unnest(data) as d
     from read_json(
-        '{{ env_var("GBGL_RAW_DIR", "../data/raw") | replace("\\", "/") }}/forecast_snapshots/*/fw48h_regional_*.json',
+        '{{ env_var("GBGL_RAW_DIR", "../data/raw") | replace("\\", "/") }}/forecast_snapshots/*/fw48h_regional_*.json*',
         columns = {captured_at: 'VARCHAR', data: 'STRUCT("from" VARCHAR, "to" VARCHAR, regions STRUCT(regionid INTEGER, intensity STRUCT(forecast INTEGER, "index" VARCHAR), generationmix STRUCT(fuel VARCHAR, perc DOUBLE)[])[])[]'},
         filename = true
     )

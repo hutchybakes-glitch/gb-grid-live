@@ -4,12 +4,12 @@
 """
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from pipeline import config
+from pipeline.storage import read_json
 
 
 @dataclass
@@ -51,8 +51,8 @@ def summarise(raw_dir: Path = config.RAW_DIR) -> dict[str, SourceSummary]:
     result: dict[str, SourceSummary] = {}
     for source_dir in sorted(p for p in raw_dir.iterdir() if p.is_dir()):
         summary = SourceSummary()
-        for path in sorted(source_dir.rglob("*.json")):
-            payload = json.loads(path.read_text(encoding="utf-8"))
+        for path in sorted([*source_dir.rglob("*.json"), *source_dir.rglob("*.json.gz")]):
+            payload = read_json(path)
             summary.add(len(payload.get("data") or []), period_times(payload))
         result[source_dir.name] = summary
     return result

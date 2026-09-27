@@ -13,6 +13,7 @@ from pipeline.http import ApiError
 from pipeline.ingest.carbon_intensity import CarbonIntensityClient
 from pipeline.raw_paths import chunk_path
 from pipeline.snapshot import take_snapshots
+from pipeline.storage import read_json
 from tests.conftest import load_fixture
 
 UTC = timezone.utc
@@ -72,7 +73,8 @@ def test_snapshot_saves_both_scopes_with_captured_at(tmp_path, make_api) -> None
     written = take_snapshots(CarbonIntensityClient(api), captured, tmp_path)
     assert set(written) == {"national", "regional"}
     for path in written.values():
-        saved = json.loads(path.read_text())
+        assert path.name.endswith(".json.gz")
+        saved = read_json(path)
         assert saved["captured_at"] == "2026-09-27T18:47:05Z"
         assert saved["data"]
     assert all("2026-09-27T18:30Z" in r.url.path for r in seen)

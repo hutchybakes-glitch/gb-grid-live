@@ -1,6 +1,7 @@
 """Raw JSON storage: atomic writes and a guard against saving empty responses."""
 from __future__ import annotations
 
+import gzip
 import json
 import os
 from pathlib import Path
@@ -19,8 +20,16 @@ def write_json_atomic(path: Path, payload: Any) -> None:
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(payload), encoding="utf-8")
+    data = json.dumps(payload).encode("utf-8")
+    # A .gz name means "store compressed": snapshots are kept in git forever.
+    tmp.write_bytes(gzip.compress(data) if path.suffix == ".gz" else data)
     os.replace(tmp, path)
+
+
+def read_json(path: Path) -> Any:
+    """Read a raw JSON file, compressed (.gz) or not."""
+    raw = path.read_bytes()
+    return json.loads(gzip.decompress(raw) if path.suffix == ".gz" else raw)
 
 
 def save_records(path: Path, payload: dict[str, Any], records_key: str = "data") -> int:

@@ -44,7 +44,8 @@ def snapshot_path(scope: str, captured_at: datetime, raw_dir: Path = config.RAW_
     # One folder per day, e.g. data/raw/forecast_snapshots/2026-09-27.
     folder = raw_dir / "forecast_snapshots" / captured_at.strftime("%Y-%m-%d")
     # File name includes the scope and capture time, so snapshots never overwrite each other.
-    return folder / f"fw48h_{scope}_{stamp(captured_at)}.json"
+    # The .gz ending means it is saved compressed: snapshots can never be re-downloaded, so they live in git.
+    return folder / f"fw48h_{scope}_{stamp(captured_at)}.json.gz"
 
 
 # Package the API response together with when and how we captured it.

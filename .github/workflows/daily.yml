@@ -1,0 +1,123 @@
+# Daily pipeline: ingest -> snapshot -> dbt build + tests -> model -> export -> site tests -> deploy.
+#
+# Storage between runs:
+# - Raw API chunks (re-fetchable) live in the Actions cache. If the cache is
+#   ever evicted, the resumable backfill simply fetches them again.
+# - Forecast snapshots cannot be re-fetched, so they are committed to the
+#   `snapshots` branch (gzipped JSON) on every run.
+name: Daily pipeline and deploy
+
+on:
+  schedule:
+    - cron: "30 5 * * *" # 05:30 UTC every day
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write # push new snapshots to the snapshots branch
+  pages: write
+  id-token: write
+
+concurrency:
+  group: daily-pipeline
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150 # the very first run backfills from 2023 (~40 min at 1 request/s)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out forecast snapshots
+        id: snapshots
+        uses: actions/checkout@v4
+        with:
+          ref: snapshots
+          path: snapshots-branch
+
+      - name: Link snapshots into the raw data folder
+        run: |
+          mkdir -p data/raw snapshots-branch/forecast_snapshots
+          ln -s "$PWD/snapshots-branch/forecast_snapshots" data/raw/forecast_snapshots
+
+      - name: Restore raw API cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            data/raw/ci_national
+            data/raw/ci_generation
+            data/raw/ci_regional
+            data/raw/pvlive_*
+          key: raw-${{ github.run_id }}
+          restore-keys: raw-
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Python unit tests
+        run: python -m pytest -q
+
+      - name: Run pipeline (ingest, snapshot, dbt build, model, export)
+        id: pipeline
+        run: python -m pipeline.run
+
+      - name: Save new forecast snapshots
+        if: always() && steps.snapshots.outcome == 'success'
+        working-directory: snapshots-branch
+        run: |
+          git config user.name "gb-grid-live bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add forecast_snapshots
+          if git diff --cached --quiet; then
+            echo "No new snapshots"
+          else
+            git commit -m "Forecast snapshot $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push
+          fi
+
+      - name: Save raw API cache
+        if: always() && steps.pipeline.outcome != 'skipped'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            data/raw/ci_national
+            data/raw/ci_generation
+            data/raw/ci_regional
+            data/raw/pvlive_*
+          key: raw-${{ github.run_id }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build and test the site
+        working-directory: web
+        run: |
+          npm ci
+          npm test
+          npm run build
+          npx playwright install --with-deps chromium
+          npm run e2e
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

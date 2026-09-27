@@ -3,6 +3,8 @@
 # Allows modern type-hint syntax.
 from __future__ import annotations
 
+# Compresses and decompresses data (used for .gz snapshot files).
+import gzip
 # Converts Python data to JSON text.
 import json
 # Gives access to os.replace, which swaps a file into place in one step.
@@ -31,10 +33,22 @@ def write_json_atomic(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     # Choose a temporary name next to the real file, e.g. chunk.json.tmp.
     tmp = path.with_suffix(path.suffix + ".tmp")
-    # Write all the JSON to the temporary file first.
-    tmp.write_text(json.dumps(payload), encoding="utf-8")
+    # Turn the data into JSON text, then into bytes.
+    data = json.dumps(payload).encode("utf-8")
+    # If the file name ends in .gz, compress it first (snapshots are kept in git forever, so size matters).
+    tmp.write_bytes(gzip.compress(data) if path.suffix == ".gz" else data)
     # Swap the finished temp file into the real name in one step: the file either exists complete, or not at all.
     os.replace(tmp, path)
+
+
+# Read a raw file back, whether or not it is compressed.
+def read_json(path: Path) -> Any:
+    # The docstring.
+    """Read a raw JSON file, compressed (.gz) or not."""
+    # Read the file's bytes.
+    raw = path.read_bytes()
+    # Decompress if it is a .gz file, then turn the JSON text back into Python data.
+    return json.loads(gzip.decompress(raw) if path.suffix == ".gz" else raw)
 
 
 # Save an API response, but only if it actually contains data.

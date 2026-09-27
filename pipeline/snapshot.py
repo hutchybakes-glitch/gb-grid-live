@@ -26,7 +26,8 @@ log = logging.getLogger("pipeline.snapshot")
 def snapshot_path(scope: str, captured_at: datetime, raw_dir: Path = config.RAW_DIR) -> Path:
     """Where one snapshot file is stored."""
     folder = raw_dir / "forecast_snapshots" / captured_at.strftime("%Y-%m-%d")
-    return folder / f"fw48h_{scope}_{stamp(captured_at)}.json"
+    # Gzipped: snapshots cannot be refetched, so they are kept in git (see DECISIONS.md).
+    return folder / f"fw48h_{scope}_{stamp(captured_at)}.json.gz"
 
 
 def wrap(payload: dict[str, Any], captured_at: datetime, request_path: str) -> dict[str, Any]:
