@@ -31,8 +31,8 @@ from pipeline.chunks import Chunk, iter_chunks
 from pipeline.http import ApiError
 # The PV_Live module (for helper functions like pes_ids).
 from pipeline.ingest import pvlive
-# The Carbon Intensity client and its list of endpoints.
-from pipeline.ingest.carbon_intensity import RANGE_ENDPOINTS, CarbonIntensityClient
+# The Carbon Intensity client, its list of endpoints, and each endpoint's maximum chunk length.
+from pipeline.ingest.carbon_intensity import RANGE_ENDPOINTS, CarbonIntensityClient, max_days
 # The PV_Live client.
 from pipeline.ingest.pvlive import PVLiveClient
 # Rules for naming raw files, and finding older partial versions of the same chunk.
@@ -169,8 +169,6 @@ def run(start: datetime, end: datetime, sources: list[str] | None, raw_dir: Path
     if unknown:
         # ...stop and list the valid names.
         raise SystemExit(f"unknown sources: {sorted(unknown)}; choose from {sorted(fetchers)}")
-    # Chop the date range into 14-day chunks.
-    chunks = list(iter_chunks(start, end))
     # Start a fresh scoreboard.
     stats = BackfillStats()
     # Go through each source in turn.
@@ -179,6 +177,8 @@ def run(start: datetime, end: datetime, sources: list[str] | None, raw_dir: Path
         if sources and source not in sources:
             # Next source.
             continue
+        # Chop the date range into chunks: 14 days, or 13 for regional (its API rejects exactly 14).
+        chunks = list(iter_chunks(start, end, days=max_days(source)))
         # Log a header line for this source.
         log.info("== %s: %d chunks ==", source, len(chunks))
         # Download its missing chunks.
