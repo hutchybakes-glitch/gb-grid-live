@@ -47,3 +47,17 @@ DuckDB, dbt, pandas and the modelling libraries will be added in the phase that 
 - **PES to CI region mapping:** built in Phase 2 by matching names from `pes_list` against CI `dnoregion`/`shortname`, with a test that all 14 areas map one-to-one. Hard-coded ids were rejected because DATA.md says to look ids up, not guess them.
 - **Daily job:** `snapshot` and `backfill` stay as separate commands. The Phase 5 scheduled workflow will run both (backfill first, which only fetches the newest chunk, then snapshot). Combining them now would add scheduling logic before Phase 5 needs it.
 - **learning/:** extended to cover `pvlive.py`, `storage.py` and `snapshot.py`, so every Phase 1 module with real logic has a study copy.
+
+
+## 2026-09-27 — Phase 2 decisions
+- **Backfill now runs up to the current half-hour, and chunks ending in the last 2 days are refetched on every run** (`REFRESH_RECENT_DAYS`). Without this, the freshness test could never pass, and periods fetched just after they ended would keep null `actual` values forever. Refetching an existing file with an empty response never overwrites it (unit-tested). Rejected alternative: a separate "latest" fetcher, which would mean two code paths.
+- **Bronze reads raw JSON directly with DuckDB `read_json` and explicit column types** instead of a Python loader. There is one less moving part, and the types are pinned so API additions cannot silently change schemas. Bronze is rebuilt in full each run; this takes about 40 s at this data size.
+- **Regional generation mix is kept as a list in bronze and unnested in silver** (`silver_generation_mix_regional`), which keeps bronze about 9x smaller.
+- **Silver dedup rules:** national prefers the copy that has an `actual`, then the newest file. Regional and generation keep the newest file. PV_Live keeps the greatest `updated_gmt`. All three are covered by dbt tests (two are dbt unit tests with synthetic revisions).
+- **PV_Live `datetime_gmt` is treated as the period end**, so `period_start_utc = datetime_gmt - 30 min`. This matches the Sheffield Solar convention and makes PV_Live join cleanly with Carbon Intensity periods.
+- **PES to region mapping:** the seed `pes_region_map.csv` maps the standard GSP group letters (`_A`...`_P`, from `pes_list.pes_name`) to CI `shortname`. Both sides are joined by name, not by id. Test: all 14 DNO regions map one-to-one.
+- **Clock-change detection** counts local half-hours from local midnight to the next local midnight, not by counting rows, so partial days at the edges of the range are correct.
+- **Completeness and freshness tests have severity `warn`**, as DATA.md specifies. Gaps are published through `gold_data_gaps` and `gold_pipeline_health`.
+- **No dbt packages** (such as dbt_utils): the two generic tests needed are 10 lines of macros, and the build then needs no network access.
+- **dbt schemas are named after layers** (`bronze.`, `silver.`, `dim.`, `gold.`, `ref.`) via `generate_schema_name`.
+- **`gold_region_now` and `gold_region_48h` come from the latest forecast snapshot**, because the site needs a forecast and ranged history is only as fresh as the last backfill.

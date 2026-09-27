@@ -1,0 +1,8 @@
+# No secrets: DuckDB is a local file. Paths can be overridden by pipeline.run.
+gb_grid_live:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('GBGL_DB_PATH', '../data/warehouse.duckdb') }}"
+      threads: 4

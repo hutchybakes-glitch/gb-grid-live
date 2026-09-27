@@ -1,0 +1,31 @@
+name: gb_grid_live
+version: "0.2.0"
+config-version: 2
+profile: gb_grid_live
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  # First UTC half-hour the warehouse covers (matches the backfill start).
+  start_date: "2023-01-01"
+
+models:
+  gb_grid_live:
+    +materialized: table
+    bronze:
+      +schema: bronze
+    silver:
+      +schema: silver
+    dim:
+      +schema: dim
+    gold:
+      +schema: gold
+
+seeds:
+  gb_grid_live:
+    +schema: ref

@@ -19,6 +19,10 @@ MAX_CHUNK_DAYS: int = 14
 # days" (the national one accepts it), so regional uses 13-day chunks.
 REGIONAL_CHUNK_DAYS: int = 13
 
+# Chunks ending within this many days of the run are refetched every run,
+# because recent actuals and PV_Live estimates are still being filled in.
+REFRESH_RECENT_DAYS: int = 2
+
 # Politeness: at most one request per second across the whole process.
 MIN_SECONDS_BETWEEN_REQUESTS: float = 1.0
 MAX_RETRIES: int = 5

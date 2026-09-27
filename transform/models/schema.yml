@@ -1,0 +1,142 @@
+version: 2
+
+models:
+  # ---------- bronze ----------
+  - name: bronze_ci_national
+    description: Raw national intensity records, one row per record per file.
+  - name: bronze_ci_generation
+    description: Raw national generation mix, one row per record per fuel per file.
+  - name: bronze_ci_regional
+    description: Raw regional forecast records, one row per record per region per file.
+  - name: bronze_pvlive
+    description: Raw PV_Live tuples for national and PES areas; raw key is (area_id, datetime_gmt, updated_gmt).
+  - name: bronze_pvlive_areas
+    description: PV_Live PES area list.
+  - name: bronze_forecast_snapshots
+    description: Every fw48h forecast captured by pipeline.snapshot, with captured_at.
+    columns:
+      - name: captured_at
+        data_tests: [not_null]
+
+  # ---------- silver ----------
+  - name: silver_ci_national
+    description: One row per national UTC half-hour; forecast, actual (null if not yet published) and band.
+    columns:
+      - name: period_start_utc
+        data_tests: [unique, not_null]
+      - name: forecast_gco2_kwh
+        data_tests:
+          - between:
+              arguments: {min_value: 0, max_value: 1000}
+      - name: actual_gco2_kwh
+        data_tests:
+          - between:
+              arguments: {min_value: 0, max_value: 1000}
+
+  - name: silver_ci_regional
+    description: One row per (region, half-hour) regional forecast.
+    data_tests:
+      - unique_combination:
+              arguments: {columns: [region_id, period_start_utc]}
+    columns:
+      - name: region_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_region'), field: region_id}
+      - name: period_start_utc
+        data_tests: [not_null]
+      - name: forecast_gco2_kwh
+        data_tests:
+          - between:
+              arguments: {min_value: 0, max_value: 1000}
+
+  - name: silver_generation_mix
+    description: National generation mix, one row per (half-hour, fuel).
+    data_tests:
+      - unique_combination:
+              arguments: {columns: [period_start_utc, fuel]}
+    columns:
+      - name: period_start_utc
+        data_tests: [not_null]
+      - name: fuel
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [biomass, coal, imports, gas, nuclear, other, hydro, solar, wind]
+
+  - name: silver_generation_mix_regional
+    description: Regional generation mix, one row per (region, half-hour, fuel).
+    data_tests:
+      - unique_combination:
+              arguments: {columns: [region_id, period_start_utc, fuel]}
+    columns:
+      - name: region_id
+        data_tests: [not_null]
+      - name: period_start_utc
+        data_tests: [not_null]
+      - name: fuel
+        data_tests: [not_null]
+
+  - name: silver_pvlive
+    description: Solar outturn per (area, half-hour start), latest PV_Live revision only.
+    data_tests:
+      - unique_combination:
+              arguments: {columns: [area_id, period_start_utc]}
+    columns:
+      - name: area_id
+        data_tests: [not_null]
+      - name: period_start_utc
+        data_tests: [not_null]
+
+  # ---------- dims ----------
+  - name: dim_region
+    description: Carbon Intensity regions 1-18 with names from the API and the matching PV_Live PES area.
+    columns:
+      - name: region_id
+        data_tests: [unique, not_null]
+      - name: short_name
+        data_tests: [not_null]
+
+  - name: dim_time
+    description: UTC half-hour slots with UK local time and clock-change flags (46/50 half-hour days).
+    columns:
+      - name: period_start_utc
+        data_tests: [unique, not_null]
+      - name: local_day_half_hours
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [46, 48, 50]
+
+  # ---------- gold ----------
+  - name: gold_pipeline_health
+    description: One row per source with coverage, duplicates removed and gap counts.
+    columns:
+      - name: source
+        data_tests: [unique, not_null]
+  - name: gold_data_gaps
+    description: Every missing expected half-hour per source and area.
+  - name: gold_region_now
+    description: Current forecast per region from the latest snapshot, with mix and GB comparison.
+    columns:
+      - name: region_id
+        data_tests: [unique, not_null]
+  - name: gold_region_48h
+    description: Latest 48h regional forecast from snapshots.
+    data_tests:
+      - unique_combination:
+              arguments: {columns: [region_id, period_start_utc]}
+
+seeds:
+  - name: pes_region_map
+    description: Standard GSP group letter to Carbon Intensity region short name (by name, not id).
+    columns:
+      - name: gsp_group
+        data_tests: [unique, not_null]
+      - name: ci_shortname
+        data_tests:
+          - unique
+          - relationships:
+              arguments: {to: ref('dim_region'), field: short_name}

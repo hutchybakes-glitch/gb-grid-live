@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import httpx
 
@@ -90,3 +90,25 @@ def test_summary_counts_both_formats(tmp_path) -> None:
 
 def test_cli_parses_dates() -> None:
     assert backfill.parse_date("2023-01-01") == datetime(2023, 1, 1, tzinfo=UTC)
+
+
+def test_recent_chunks_are_refetched_old_ones_are_not(tmp_path) -> None:
+    body = load_fixture("ci_national.json")
+    backfill_source("ci_national", lambda c: body, CHUNKS, tmp_path, BackfillStats())
+    calls: list[datetime] = []
+    stats = BackfillStats()
+    refresh_after = CHUNKS[-1].end - timedelta(days=2)
+    backfill_source(
+        "ci_national", lambda c: calls.append(c.start) or body, CHUNKS, tmp_path, stats, refresh_after
+    )
+    assert calls == [CHUNKS[-1].start]
+    assert (stats.fetched, stats.skipped) == (1, len(CHUNKS) - 1)
+
+
+def test_refetch_with_empty_response_keeps_existing_file(tmp_path) -> None:
+    body = load_fixture("ci_national.json")
+    backfill_source("ci_national", lambda c: body, CHUNKS[:1], tmp_path, BackfillStats())
+    stats = BackfillStats()
+    backfill_source("ci_national", lambda c: {"data": []}, CHUNKS[:1], tmp_path, stats, CHUNKS[0].start)
+    assert stats.empty == 1
+    assert json.loads(chunk_path("ci_national", CHUNKS[0], tmp_path).read_text()) == body

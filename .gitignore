@@ -10,3 +10,4 @@ node_modules/
 web/dist/
 transform/target/
 transform/logs/
+data/dbt_test_results.json

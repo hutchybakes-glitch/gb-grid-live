@@ -1,7 +1,7 @@
 """Resumable, idempotent backfill of raw data for both sources.
 
 Usage (PowerShell):
-    python -m pipeline.backfill                      # 2023-01-01 to today, all sources
+    python -m pipeline.backfill                      # 2023-01-01 to now, all sources
     python -m pipeline.backfill --start 2024-01-01 --sources ci_national
 """
 from __future__ import annotations
@@ -10,12 +10,12 @@ import argparse
 import logging
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
 
 from pipeline import config
-from pipeline.chunks import Chunk, iter_chunks
+from pipeline.chunks import Chunk, floor_half_hour, iter_chunks
 from pipeline.http import ApiError
 from pipeline.ingest import pvlive
 from pipeline.ingest.carbon_intensity import RANGE_ENDPOINTS, CarbonIntensityClient, max_days
@@ -43,9 +43,21 @@ def parse_date(text: str) -> datetime:
     return datetime.strptime(text, "%Y-%m-%d").replace(tzinfo=timezone.utc)
 
 
-def today_midnight_utc() -> datetime:
-    """Midnight UTC today: the backfill stops here so every chunk covers whole days."""
-    return datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+def default_end() -> datetime:
+    """The start of the current half-hour: fetch everything published so far."""
+    return floor_half_hour(datetime.now(timezone.utc))
+
+
+def needs_fetch(path: Path, chunk: Chunk, refresh_after: datetime | None) -> bool:
+    """A chunk is fetched if it is missing, or if it ends recently enough to still change.
+
+    Recent periods gain their ``actual`` values (and PV_Live revises estimates)
+    after first publication, so chunks ending after ``refresh_after`` are
+    refetched on every run until they are safely in the past.
+    """
+    if not path.exists():
+        return True
+    return refresh_after is not None and chunk.end > refresh_after
 
 
 def build_fetchers(ci: CarbonIntensityClient, pv: PVLiveClient, raw_dir: Path) -> dict[str, Fetcher]:
@@ -64,12 +76,17 @@ def build_fetchers(ci: CarbonIntensityClient, pv: PVLiveClient, raw_dir: Path) -
 
 
 def backfill_source(
-    source: str, fetch: Fetcher, chunks: list[Chunk], raw_dir: Path, stats: BackfillStats
+    source: str,
+    fetch: Fetcher,
+    chunks: list[Chunk],
+    raw_dir: Path,
+    stats: BackfillStats,
+    refresh_after: datetime | None = None,
 ) -> None:
-    """Fetch every missing chunk of one source, skipping those already on disk."""
+    """Fetch missing (and recent) chunks of one source, skipping the rest."""
     for chunk in chunks:
         path = chunk_path(source, chunk, raw_dir)
-        if path.exists():
+        if not needs_fetch(path, chunk, refresh_after):
             stats.skipped += 1
             continue
         try:
@@ -88,8 +105,15 @@ def backfill_source(
         log.info("%s %s: %d rows", source, path.name, rows)
 
 
-def run(start: datetime, end: datetime, sources: list[str] | None, raw_dir: Path = config.RAW_DIR) -> BackfillStats:
+def run(
+    start: datetime,
+    end: datetime,
+    sources: list[str] | None,
+    raw_dir: Path = config.RAW_DIR,
+    refresh_days: int = config.REFRESH_RECENT_DAYS,
+) -> BackfillStats:
     """Backfill ``sources`` (all if None) for [start, end) and return run statistics."""
+    refresh_after = end - timedelta(days=refresh_days)
     ci, pv = CarbonIntensityClient(), PVLiveClient()
     fetchers = build_fetchers(ci, pv, raw_dir)
     unknown = set(sources or []) - set(fetchers)
@@ -101,7 +125,7 @@ def run(start: datetime, end: datetime, sources: list[str] | None, raw_dir: Path
             continue
         chunks = list(iter_chunks(start, end, days=max_days(source)))
         log.info("== %s: %d chunks ==", source, len(chunks))
-        backfill_source(source, fetch, chunks, raw_dir, stats)
+        backfill_source(source, fetch, chunks, raw_dir, stats, refresh_after)
     return stats
 
 
@@ -109,11 +133,11 @@ def main(argv: list[str] | None = None) -> int:
     """Command-line entry point; returns a non-zero exit code if any chunk failed."""
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--start", type=parse_date, default=config.BACKFILL_START)
-    parser.add_argument("--end", type=parse_date, default=None, help="exclusive; default today 00:00 UTC")
+    parser.add_argument("--end", type=parse_date, default=None, help="exclusive; default: the current half-hour")
     parser.add_argument("--sources", nargs="*", default=None)
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    stats = run(args.start, args.end or today_midnight_utc(), args.sources)
+    stats = run(args.start, args.end or default_end(), args.sources)
     log.info(
         "done: fetched %d, skipped %d existing, empty %d, failed %d",
         stats.fetched, stats.skipped, stats.empty, len(stats.failed),

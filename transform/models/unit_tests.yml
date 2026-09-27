@@ -1,0 +1,26 @@
+unit_tests:
+  - name: pvlive_keeps_latest_revision_and_shifts_to_period_start
+    description: Two revisions of the same half-hour collapse to the newest; datetime_gmt (period end) becomes period start minus 30 min.
+    model: silver_pvlive
+    given:
+      - input: ref('bronze_pvlive')
+        rows:
+          - {area_id: gsp0, datetime_gmt: "2024-06-01 12:30:00", generation_mw: 8000, updated_gmt: "2024-06-01 13:00:00", capacity_mwp: 15000, _source_file: a.json}
+          - {area_id: gsp0, datetime_gmt: "2024-06-01 12:30:00", generation_mw: 8200, updated_gmt: "2024-06-02 09:00:00", capacity_mwp: 15000, _source_file: b.json}
+          - {area_id: pes16, datetime_gmt: "2024-06-01 12:30:00", generation_mw: 600, updated_gmt: "2024-06-01 13:00:00", capacity_mwp: 1200, _source_file: c.json}
+    expect:
+      rows:
+        - {area_id: gsp0, period_start_utc: "2024-06-01 12:00:00", generation_mw: 8200, updated_gmt: "2024-06-02 09:00:00", n_versions: 2}
+        - {area_id: pes16, period_start_utc: "2024-06-01 12:00:00", generation_mw: 600, updated_gmt: "2024-06-01 13:00:00", n_versions: 1}
+
+  - name: national_dedup_prefers_row_with_actual
+    description: When chunks overlap, the copy that has an actual value wins over one where actual is still null.
+    model: silver_ci_national
+    given:
+      - input: ref('bronze_ci_national')
+        rows:
+          - {period_start_utc: "2024-06-01 12:00:00", period_end_utc: "2024-06-01 12:30:00", forecast_gco2_kwh: 150, actual_gco2_kwh: 140, intensity_index: moderate, _source_file: a.json}
+          - {period_start_utc: "2024-06-01 12:00:00", period_end_utc: "2024-06-01 12:30:00", forecast_gco2_kwh: 151, actual_gco2_kwh: null, intensity_index: moderate, _source_file: z.json}
+    expect:
+      rows:
+        - {period_start_utc: "2024-06-01 12:00:00", forecast_gco2_kwh: 150, actual_gco2_kwh: 140}

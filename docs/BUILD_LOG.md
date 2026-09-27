@@ -78,3 +78,65 @@
 
 ### Questions for Samuel
 All three Phase 1 questions were answered "go with what you think is best"; decisions are recorded in DECISIONS.md (PES mapping by name in Phase 2; snapshot + backfill combined in the Phase 5 workflow; learning/ extended to pvlive, storage and snapshot). No open questions.
+
+
+---
+
+## Session 2 — 2026-09-27 — Phase 2: warehouse and data quality
+
+Samuel asked for Phases 2–4 to run back to back, stopping only if blocked or when a decision is needed, and stopping before Phase 5.
+
+### What was built
+- dbt-duckdb project in `transform/` (profile in the repo, no secrets; paths set by `pipeline.run`).
+- **Bronze:** `bronze_ci_national`, `bronze_ci_generation`, `bronze_ci_regional`, `bronze_pvlive`, `bronze_pvlive_areas`, `bronze_forecast_snapshots`, each with `_source_file` and `_loaded_at`.
+- **Silver:** `silver_ci_national`, `silver_ci_regional`, `silver_generation_mix`, `silver_generation_mix_regional`, `silver_pvlive`.
+- **Dims:** `dim_region` (from the API, plus the PV_Live area mapped by name), `dim_time` (UTC half-hours, UK local time, clock-change flag).
+- **Gold:** `gold_pipeline_health`, `gold_data_gaps`, `gold_region_now`, `gold_region_48h`.
+- **Tests:** 43 data tests (generic and singular) and 2 dbt unit tests. Completeness and freshness are `warn`.
+- `python -m pipeline.run`: backfill, snapshot, `dbt build`, and a test summary written to `data/dbt_test_results.json`.
+- Backfill change: runs to the current half-hour and refetches chunks ending in the last 2 days (2 new pytest tests; 29 pytest tests in total).
+
+### What broke and how it was fixed
+- `local` is a reserved word in DuckDB: I renamed the CTE.
+- Counting clock-change days by rows would have mislabelled the partial first and last days; I switched to calendar arithmetic.
+- dbt 1.12 deprecation warning for generic test arguments: I moved them under `arguments:`.
+- Printing DuckDB tables in the Windows console hit a cp1252 encoding error. It only affected my evidence queries (I used plain-text output); no pipeline impact.
+- Multi-line bash heredocs containing apostrophes fail in this shell wrapper, so doc updates are written as files instead. No code impact.
+
+### Phase 2 acceptance checks
+- [x] **`python -m pipeline.run` builds all dbt models end to end.**
+  ```
+  INFO done: fetched 19, skipped 1753 existing, empty 0, failed 0
+  INFO national snapshot: 97 periods -> ...fw48h_national_20260927T1901Z.json
+  INFO regional snapshot: 97 periods -> ...fw48h_regional_20260927T1901Z.json
+  Done. PASS=63 WARN=1 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=64
+  INFO dbt build success=True; tests: {'pass': 43, 'warn': 1}
+  exit=0  elapsed=73s
+  ```
+- [x] **All dbt tests pass, or failing checks are warnings explained here.** 1 warning: `warn_national_daily_completeness`, 4 UTC days with fewer than 48 national half-hours. These are gaps in the source, not pipeline losses: the raw files don't contain these periods either (see the next item). All other tests pass, including intensity 0–1000, generation sums 100 ± 1 (national and regional), solar ≥ 0 and ≤ capacity, unique and not-null keys on every silver table, and freshness.
+- [x] **`silver_ci_national` has one row per half-hour; gaps are counted and listed.**
+  ```
+  n_rows | distinct_periods | min              | max
+  65435  | 65435            | 2023-01-01 00:00 | 2026-09-27 18:00
+  gold_data_gaps (ci_national): 2023-10-20: 4 | 2023-10-21: 48 | 2023-10-22: 39 | 2024-06-11: 2 | 2024-06-12: 29   (122 total)
+  ```
+  `gold_pipeline_health`:
+  ```
+  source        | raw_files | bronze_rows | silver_rows | dups_removed | areas | missing | days_with_gaps | complete%
+  ci_generation |        98 |       63890 |       63796 |           94 |     1 |    1761 |             46 |    97.314
+  ci_national   |        98 |       65532 |       65435 |           97 |     1 |     122 |              5 |    99.814
+  ci_regional   |       106 |     1152774 |     1150920 |         1854 |    18 |   29106 |             43 |    97.533
+  pvlive        |      1470 |      984825 |      983355 |         1470 |    15 |       0 |              0 |   100.0
+  ```
+  (Regional missing = 1,617 half-hours × 18 regions.)
+- [x] **PV_Live revisions are deduplicated to the latest version.** The dbt unit test `pvlive_keeps_latest_revision_and_shifts_to_period_start` (two revisions → the newer one kept, `n_versions = 2`) passes. The singular test `assert_pvlive_keeps_latest_revision` passes against real data, as does `unique_combination(area_id, period_start_utc)`. In the real raw data, the 1,455 keys with 2 versions are chunk-boundary overlaps; true revisions will build up as recent chunks are refetched.
+- [x] **Clock-change days show 46 / 50 local half-hours in `dim_time`.**
+  ```
+  2023-03-26 46 | 2023-10-29 50 | 2024-03-31 46 | 2024-10-27 50 | 2025-03-30 46 | 2025-10-26 50 | 2026-03-29 46
+  ```
+  Also covered by the singular test `assert_clock_change_days`.
+
+### For Samuel to review (Phase 2)
+1. The PES mapping seed `transform/seeds/pes_region_map.csv`, and the resulting `dim_region` (14/14 mapped; e.g. North West England → pes16 ENWL).
+2. The change to refetch recent chunks in the backfill (DECISIONS.md).
+3. The 1,761 missing generation-mix periods (46 days): larger than the national gaps. The site should say so.
