@@ -42,3 +42,8 @@ DuckDB, dbt, pandas and the modelling libraries will be added in the phase that 
 - **Decision:** regional uses 13-day chunks (`REGIONAL_CHUNK_DAYS`). All other sources keep 14 days, so their completed files stay valid. This corrects DATA.md's "assume the same 14-day limit": the regional limit is effectively under 14 days.
 - **Options considered:** 13 days for every source (simpler, but it would have meant refetching about 200 completed national and generation chunks); ending windows at 23:30 (fiddly, and not the same chunk scheme as the other sources).
 - The fixed failure mode worked as designed: nothing was written, the errors were logged, and the rerun fetched only the regional chunks.
+
+## 2026-09-27 — Answers to Phase 1 questions (Samuel: "go with what you think is best")
+- **PES to CI region mapping:** built in Phase 2 by matching names from `pes_list` against CI `dnoregion`/`shortname`, with a test that all 14 areas map one-to-one. Hard-coded ids were rejected because DATA.md says to look ids up, not guess them.
+- **Daily job:** `snapshot` and `backfill` stay as separate commands. The Phase 5 scheduled workflow will run both (backfill first, which only fetches the newest chunk, then snapshot). Combining them now would add scheduling logic before Phase 5 needs it.
+- **learning/:** extended to cover `pvlive.py`, `storage.py` and `snapshot.py`, so every Phase 1 module with real logic has a study copy.

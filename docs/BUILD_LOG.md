@@ -77,6 +77,4 @@
 3. The **source gaps** in the summary (~1.7k generation and regional periods missing from the API) before Phase 2 decides how to report them.
 
 ### Questions for Samuel
-- DATA.md says PV_Live "14 DNO/PES areas". I fetched PES ids 10–23 from `pes_list`, and they map to DNO areas by name, not by CI region id. OK to build that mapping in Phase 2 from names?
-- Should the daily snapshot also run the backfill for the previous day? That would be the natural Phase 5 scheduled job; for now both are separate commands.
-- `learning/` covers `chunks.py`, `http.py` and `backfill.py`. Do you also want `pvlive.py`, `storage.py` and `snapshot.py` annotated?
+All three Phase 1 questions were answered "go with what you think is best"; decisions are recorded in DECISIONS.md (PES mapping by name in Phase 2; snapshot + backfill combined in the Phase 5 workflow; learning/ extended to pvlive, storage and snapshot). No open questions.
