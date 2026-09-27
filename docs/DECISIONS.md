@@ -16,3 +16,23 @@ Checked https://carbon-intensity.github.io/api-definitions/ and https://api.sola
 
 ## 2026-09-27 — Python version
 The machine has Python 3.13.6, which meets the 3.11+ requirement. Dependencies are pinned in `requirements.txt`.
+
+## 2026-09-27 — Chunking and resume
+- **Decision:** chunks are anchored at 2023-01-01 in fixed 14-day steps, and the backfill stops at 00:00 UTC today. A chunk is "done" when its file exists. Files are written atomically (temp file, then rename), so an interrupted run cannot leave a half-file that looks finished.
+- **Options considered:** (a) a state/manifest file; (b) file existence as the marker. I chose (b) because it is simpler and needs no extra state to go stale.
+- **Trailing chunk:** the last chunk is usually shorter than 14 days. The next day's run writes a longer file with the same start date and deletes the shorter one (`stale_siblings`), so the raw folder never accumulates overlapping partial chunks.
+- **Snapshots are the exception:** they are never deleted or overwritten. Each run writes a new file named after its `captured_at` minute.
+
+## 2026-09-27 — Failures and empty responses
+- A chunk that still fails after 5 attempts (backoff 2, 4, 8, 16 s; retries on 429 and 5xx) is logged and skipped. The run continues and exits with code 1 at the end, listing every failed chunk. Rerunning the backfill fetches only those chunks.
+- 4xx errors other than 429 are not retried, because they won't succeed on a second try.
+- Responses with no records are never written, so good data can't be replaced with nothing.
+
+## 2026-09-27 — Rate limit shared per client, requests are sequential
+Each API client has its own ≥1 s limiter and requests run one after another, so no more than one request per second goes to each host. I chose sequential over concurrent requests: the backfill runs once and the extra speed isn't worth the load on free APIs.
+
+## 2026-09-27 — Snapshot start time
+`fw48h` is requested from the current half-hour, rounded down. Because of the `{from}` behaviour noted above, the first period returned is the one just finished. That is harmless, and Phase 2 can filter it out using `captured_at`.
+
+## 2026-09-27 — Only httpx and pytest pinned for Phase 1
+DuckDB, dbt, pandas and the modelling libraries will be added in the phase that first needs them, keeping Phase 1 installs small and quick.
