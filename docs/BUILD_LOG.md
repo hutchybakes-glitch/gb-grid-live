@@ -322,3 +322,8 @@ Built `pipeline/battery/` (sources, store, tariff, forecast, optimise, run), `te
 ### What Samuel should review (battery pipeline)
 1. The first scheduled `battery.yml` runs (06:15 and 17:20 UTC) on the Actions tab.
 2. The `powerbi-data` branch: one force-pushed commit each run, by design.
+
+## 2026-10-26 — Battery: last-week strategy covers every settled day
+- **Found while checking the Power BI model:** the "planned on last week's prices" strategy had no result on 10 days (5 in the last 12 months), the days a week after Elexon's market index had gaps. Its 12-month total was over 5 fewer days than the other strategies, so it was understated by about £9 and "a good forecast is worth" overstated by the same.
+- **Fix:** where last week's half-hour is missing, the plan uses the same half-hour two weeks earlier (`lag_14d`, not a model feature), as an operator would. The forecast-accuracy yardstick still uses pure last-week prices.
+- **Checks:** `pytest -q tests/test_battery.py` 31 passed (new test for the fallback); every settled day now has all 4 strategies. Default battery, last 12 months: planned on last week's prices +£683.80 (was +£674.64); the other strategies are unchanged.

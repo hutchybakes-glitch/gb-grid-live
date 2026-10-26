@@ -130,3 +130,17 @@ def test_wind_solar_overlap_not_double_counted() -> None:
     out = sources.wind_solar_forecast(_FakeClient(), date(2026, 1, 15), date(2026, 1, 15))
     assert out["wind_mw"].max() == 300.0
     assert out["solar_mw"].max() == 5.0
+
+
+def test_last_week_falls_back_to_two_weeks_ago() -> None:
+    """When last week's price is missing, lag_14d (two weeks back) is available to stand in for it."""
+    start, _ = sources.local_day_bounds(date(2026, 1, 1))
+    idx = pd.date_range(start, periods=48 * 20, freq="30min", tz="UTC")
+    price = np.arange(len(idx), dtype=float)
+    price[48 * 8 + 5] = np.nan
+    hh = pd.DataFrame({"period_start_utc": idx, "price": price, "wind_mw": 1.0, "solar_mw": 0.0, "demand_mw": 2.0})
+    f = forecast.build_features(hh)
+    row = f.iloc[48 * 15 + 5]
+    assert np.isnan(row["lag_7d"])
+    assert row["lag_14d"] == 48 * 1 + 5
+    assert "lag_14d" not in forecast.FEATURES

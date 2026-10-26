@@ -46,7 +46,8 @@ def build_features(hh: pd.DataFrame) -> pd.DataFrame:
 
     # Lags by local day and slot: D-2 is the latest whole day known at 17:15 on D-1.
     by_key = df.groupby(["local_date", "slot"])["price"].mean()
-    for days, name in ((2, "lag_2d"), (7, "lag_7d")):
+    # lag_14d is not a model feature: it stands in for last week's prices when that week has gaps (LastWeek strategy).
+    for days, name in ((2, "lag_2d"), (7, "lag_7d"), (14, "lag_14d")):
         key = pd.MultiIndex.from_arrays([df["local_date"] - timedelta(days=days), df["slot"]])
         df[name] = by_key.reindex(key).to_numpy()
 

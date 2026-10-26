@@ -163,7 +163,10 @@ def _day_inputs(feat: pd.DataFrame, fits: pd.DataFrame, days: list[date]) -> lis
         if g["price"].isna().any():
             continue
         fc = g["forecast"].to_numpy() if g["forecast"].notna().all() else None
-        base = g["lag_7d"].to_numpy() if g["lag_7d"].notna().all() and len(g) == len(g["lag_7d"]) else None
+        # Last week's prices; where that week has gaps, the week before (what an operator would plan on), so the
+        # LastWeek strategy covers the same days as the others.
+        week = g["lag_7d"].fillna(g["lag_14d"])
+        base = week.to_numpy() if week.notna().all() else None
         local_hour = g["period_start_utc"].dt.tz_convert(settings.UK).dt.hour.to_numpy()
         jobs.append((d, g["period_start_utc"].to_numpy(), g["price"].to_numpy(), fc, base,
                      g["carbon"].to_numpy(dtype=float), local_hour, fits))
