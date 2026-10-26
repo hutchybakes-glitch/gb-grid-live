@@ -12,3 +12,7 @@ These files are for reading only; the real code lives in `pipeline/`. They are r
 | `storage.py` | `pipeline/storage.py` | Atomic writes and never saving empty data |
 | `snapshot.py` | `pipeline/snapshot.py` | Capturing forecast "vintages" with a timestamp |
 | `features.py` | `pipeline/model/features.py` | Building model inputs without peeking at the future (no leakage) |
+| `battery_sources.py` | `pipeline/battery/sources.py` | Downloading forecasts "as known at the time" so a backtest can't cheat |
+| `forecast.py` | `pipeline/battery/forecast.py` | A LightGBM price forecast, tested month by month on data it never saw |
+| `optimise.py` | `pipeline/battery/optimise.py` | Planning a battery exactly with a linear programme, and settling it at real prices |
+| `tariff.py` | `pipeline/battery/tariff.py` | Fitting a tariff formula by least squares without republishing the prices |
