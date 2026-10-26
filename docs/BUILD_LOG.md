@@ -306,3 +306,19 @@ The GitHub credentials stored on this machine belong to the account `sammyhutch`
 1. The first **scheduled** run tomorrow at 05:30 UTC (Actions tab). It should take a few minutes now that the cache exists.
 2. The live site on your phone: load speed on mobile data is the weakest point.
 3. The `snapshots` branch: a bot commit is added every day; this is intended.
+
+## 2026-10-26 — Battery pipeline for the GB Battery Watch Power BI report
+Built `pipeline/battery/` (sources, store, tariff, forecast, optimise, run), `tests/test_battery.py` and `.github/workflows/battery.yml`. Decisions in `docs/DECISIONS.md` (same date).
+
+- **Backfill:** 1,030 days of Elexon market index, day-ahead wind/solar (DGWS) and demand (NDF) forecasts, and NESO carbon intensity, about 25 minutes at one request a second. NDF allows only one day of publications per call (1,031 calls).
+- **Bug found and fixed during the build:** DGWS groups by UTC day, so in BST the first hour of each UK day was missing; the fetch now starts a day early and trims to UK local days.
+- **A crashed first run:** the optimiser's worker processes re-imported `run.py` after I had changed it mid-run (a new strategy argument) and failed with "not enough values to unpack". Nothing was lost (state is saved per source); the rerun took 11 minutes for 655 days x 15 price views x 9 battery types x 4 strategies (352,350 rows).
+- **Checks run:**
+  - `python -m pytest -q tests/test_battery.py`: 29 passed (charge level within 0..1, power limits, no simultaneous charge and use including negative prices, day ends where it began, both clock changes, tariff formula and cap, no look-ahead in the forecast inputs or features).
+  - On the real results: perfect hindsight >= every other strategy on every day net of the wear cost: 0 exceptions in 88,425 day x region x battery cases.
+  - Forecast backtest (664 days, rolling monthly retrain): mean absolute error £20.5/MWh vs £29.3 for "same time last week"; better on 65.5% of days; within-day shape correlation 0.76.
+- **Headline (North West, 10 kWh, 2-hour, 90%, last 12 months):** best possible +£907, planned on our forecast +£770 (85%), planned on last week's prices +£675, simple timer +£509.
+
+### What Samuel should review (battery pipeline)
+1. The first scheduled `battery.yml` runs (06:15 and 17:20 UTC) on the Actions tab.
+2. The `powerbi-data` branch: one force-pushed commit each run, by design.

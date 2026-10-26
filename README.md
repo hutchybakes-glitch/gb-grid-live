@@ -26,6 +26,15 @@ PV_Live (solar) ──────┴─> raw JSON ─> bronze ─> silver ─> 
 - **Every non-obvious choice** is in [`docs/DECISIONS.md`](docs/DECISIONS.md); what was built, what broke and how it was fixed is in [`docs/BUILD_LOG.md`](docs/BUILD_LOG.md).
 - **`learning/`** has line-by-line commented copies of the key modules.
 
+## Also feeds a Power BI report: GB Battery Watch
+
+The same project now feeds a second product. **GB Battery Watch** (Power BI) answers *"how do we get the most out of a battery?"*: when to charge, when to use the stored power, what that saves, and whether a battery is worth buying.
+
+- `pipeline/battery/` fetches Elexon wholesale prices and day-ahead wind, solar and demand forecasts, forecasts tomorrow's price (LightGBM, backtested honestly against what was known the day before), and runs an exact battery optimiser (a linear programme per day) for 14 regions plus wholesale, 3 battery durations, 3 efficiencies and 3 strategies.
+- `.github/workflows/battery.yml` runs it at 06:15 and 17:20 UTC and publishes small CSVs to the `powerbi-data` branch, which Power BI reads from raw.githubusercontent.com with no gateway.
+- Run it locally with `python -m pipeline.battery.run` (`--no-fetch` to rebuild from saved state); tests: `python -m pytest -q tests/test_battery.py`.
+- Why it is built this way (tariff terms, no free day-ahead price, the optimiser's assumptions) is in [`docs/DECISIONS.md`](docs/DECISIONS.md).
+
 ## Setup (Windows, PowerShell)
 
 ```powershell
@@ -66,8 +75,9 @@ npm run e2e          # smoke tests against the production build (desktop and 360
 - **Carbon Intensity API**, NESO, CC BY 4.0: https://carbonintensity.org.uk
 - **PV_Live**, Sheffield Solar (University of Sheffield), funded by NESO: https://www.solar.sheffield.ac.uk/pvlive/
 - **Historic Demand Data**, NESO, NESO Open Data Licence: https://www.neso.energy/data-portal/historic-demand-data
+- **Elexon Insights (BMRS)**, wholesale prices and day-ahead forecasts (battery pipeline): Contains BMRS data © Elexon Limited copyright and database right 2026. Licence: https://www.elexon.co.uk/data/balancing-mechanism-reporting-agent/copyright-licence-bmrs-data/
 
-Independent project, not affiliated with NESO or Sheffield Solar.
+Independent project, not affiliated with NESO, Sheffield Solar, Elexon or any energy supplier.
 
 ## Built with Claude Code
 The code was written by Claude Code working from a written spec (`SPEC.md`, `DATA.md`, `DESIGN.md`, `PHASES.md`, `ACCEPTANCE.md`) in five phases, each ending with acceptance checks whose evidence is recorded in the build log. Samuel wrote the spec, made the product decisions and reviewed each phase.

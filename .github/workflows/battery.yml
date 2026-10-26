@@ -1,0 +1,64 @@
+# Battery pipeline for the GB Battery Watch Power BI report: prices -> forecast -> optimiser -> CSVs.
+#
+# Runs twice a day:
+# - 06:15 UTC: yesterday's actual prices are in, so yesterday's results and plan review are settled.
+# - 17:20 UTC: Elexon publishes tomorrow's wind and solar forecast at 16:45 UTC, so tomorrow can be planned.
+# Power BI's scheduled refreshes are set after these (GitHub can start a scheduled run up to ~1 hour late).
+#
+# Storage: the outputs live on the `powerbi-data` branch, which Power BI reads from raw.githubusercontent.com.
+# It is force-pushed as a single commit each run, so the repository doesn't grow with every run. Every input
+# can be re-fetched from the public APIs, so no history is lost by this.
+name: Battery pipeline (Power BI data)
+
+on:
+  schedule:
+    - cron: "15 6 * * *"
+    - cron: "20 17 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write # force-push the powerbi-data branch
+
+concurrency:
+  group: battery-pipeline
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120 # a run from empty state backfills since 2024 (~35 min of API calls + the optimiser)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out the previous outputs (this run's starting state)
+        id: previous
+        continue-on-error: true # the very first run has no branch yet and starts from empty
+        uses: actions/checkout@v4
+        with:
+          ref: powerbi-data
+          path: data/battery
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Battery unit tests
+        run: python -m pytest -q tests/test_battery.py
+
+      - name: Run the battery pipeline
+        run: python -m pipeline.battery.run --workers 2
+
+      - name: Publish the outputs to the powerbi-data branch
+        working-directory: data/battery
+        run: |
+          rm -rf .git
+          git init -q -b powerbi-data
+          git config user.name "gb-grid-live bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Battery data $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" powerbi-data

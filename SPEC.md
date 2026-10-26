@@ -48,4 +48,4 @@ Every screen must help answer that question. If a feature does not, it is out of
 - Footer: data credits and licences, "independent project, not affiliated with NESO or Sheffield Solar".
 
 ## Out of scope (v1)
-- Electricity prices or tariffs, user accounts, notifications, any backend server, Northern Ireland.
+- Electricity prices or tariffs (on the website; since 26 Oct 2026 `pipeline/battery/` adds prices for the separate GB Battery Watch Power BI report, see docs/DECISIONS.md), user accounts, notifications, any backend server, Northern Ireland.
