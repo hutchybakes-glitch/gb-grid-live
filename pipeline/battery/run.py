@@ -287,7 +287,7 @@ def daily_prices(feat: pd.DataFrame) -> pd.DataFrame:
             "MaxPrice": round(float(p[-1]), 2),
             "Spread4hGBP": round(float(p[-k:].mean() - p[:k].mean()), 2),
             "NegativeHalfHours": int((g["price"] < 0).sum()),
-            "AvgLeftoverMW": round(float(g["leftover_mw"].mean()), 0) if g["leftover_mw"].notna().any() else None,
+            "AvgLeftoverMW": round(float((g["demand_mw"] - g["wind_mw"]).mean()), 0) if g["demand_mw"].notna().any() else None,
             "AvgWindMW": round(float(g["wind_mw"].mean()), 0) if g["wind_mw"].notna().any() else None,
             # slot:price pairs, so repeated or skipped hours on clock-change days stay unambiguous
             "PricesPacked": "|".join(f"{s}:{round(v)}" for s, v in zip(g["slot"], g["price"])),
@@ -313,7 +313,9 @@ def export_half_hours(feat: pd.DataFrame, plan_day: date, review_day: date) -> p
         "DemandFcMW": feat["demand_mw"].round(0).astype("Int64"),
         "WindFcMW": feat["wind_mw"].round(0).astype("Int64"),
         "SolarFcMW": feat["solar_mw"].round(0).astype("Int64"),
-        "LeftoverMW": feat["leftover_mw"].round(0).astype("Int64"),
+        # Demand the wind and sun can't cover. National demand (NDF) already excludes rooftop and other embedded
+        # solar, which shows up as lower demand, so only wind is taken off; subtracting solar again counted it twice.
+        "LeftoverMW": (feat["demand_mw"] - feat["wind_mw"]).round(0).astype("Int64"),
         "CarbonIntensity": feat["carbon"].round(0).astype("Int64"),
         "IsPlanDay": (feat["local_date"] == plan_day).astype(int),
         # The last fully priced day, reviewed on the plan page ("how yesterday's plan did")

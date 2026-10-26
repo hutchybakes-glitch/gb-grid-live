@@ -108,3 +108,25 @@ def test_store_runs_groups_consecutive_days() -> None:
     d = date(2026, 1, 1)
     days = [d, d + timedelta(1), d + timedelta(2), d + timedelta(5)]
     assert store.runs(days) == [(d, d + timedelta(2)), (d + timedelta(5), d + timedelta(5))]
+
+
+class _FakeClient:
+    """Returns two overlapping DGWS chunks, like the real API does at chunk boundaries."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def get_json(self, path: str, params: dict) -> dict:
+        self.calls += 1
+        rows = []
+        for start in ("2026-01-14T23:30:00Z", "2026-01-15T00:00:00Z"):
+            for psr, q in (("Wind Onshore", 100.0), ("Wind Offshore", 200.0), ("Solar", 5.0)):
+                rows.append({"startTime": start, "publishTime": "2026-01-14T16:45:00Z", "psrType": psr, "quantity": q})
+        return {"data": rows}
+
+
+def test_wind_solar_overlap_not_double_counted() -> None:
+    """The same half-hour returned by two chunks is counted once."""
+    out = sources.wind_solar_forecast(_FakeClient(), date(2026, 1, 15), date(2026, 1, 15))
+    assert out["wind_mw"].max() == 300.0
+    assert out["solar_mw"].max() == 5.0

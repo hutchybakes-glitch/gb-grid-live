@@ -85,6 +85,9 @@ def wind_solar_forecast(client: ApiClient, first: date, last: date) -> pd.DataFr
     raw = pd.concat(frames)
     raw["period_start_utc"] = pd.to_datetime(raw["startTime"], utc=True)
     raw["publish_utc"] = pd.to_datetime(raw["publishTime"], utc=True)
+    # Each request also returns the first half-hour of the next chunk, so the same row arrives twice at chunk
+    # boundaries; without this the wind and solar for those half-hours were summed twice (found in review).
+    raw = raw.drop_duplicates(["period_start_utc", "psrType", "publish_utc"])
     raw = _keep_known_at_decision(raw)
     raw["kind"] = raw["psrType"].map({"Solar": "solar_mw", "Wind Offshore": "wind_mw", "Wind Onshore": "wind_mw"})
     wide = raw.groupby(["period_start_utc", "kind"])["quantity"].sum().unstack("kind").reset_index()
