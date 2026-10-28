@@ -2,7 +2,7 @@ import Status, { allReady } from '../components/Status'
 import { useData, type PipelineHealth, type Trust } from '../lib/data'
 import { ukDateTime, ukZone, whole } from '../lib/format'
 
-const REPO = 'https://github.com/hutchybakes-glitch/gb-grid-live'
+const REPO = 'https://github.com/swhutchinson/gb-grid-live'
 const SOURCE_LABEL: Record<string, string> = {
   ci_national: 'Carbon Intensity: national',
   ci_generation: 'Carbon Intensity: generation mix',

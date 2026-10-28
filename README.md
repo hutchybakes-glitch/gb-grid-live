@@ -2,7 +2,7 @@
 
 *Use power when the grid is cleanest.*
 
-**Live site: https://hutchybakes-glitch.github.io/gb-grid-live/**
+**Live site: https://swhutchinson.github.io/gb-grid-live/**
 
 GB Grid Live shows how clean electricity is in each region of Great Britain right now, and finds the cleanest time in the next 48 hours to charge a car or run the washing machine. Behind it is a daily data pipeline (Python, DuckDB, dbt) that ingests open data from NESO and Sheffield Solar, tests the data, and publishes a static site through GitHub Actions. It also checks how accurate the official NESO carbon forecast is, and backtests an error-correction model against it honestly.
 
@@ -38,7 +38,7 @@ The same project now feeds a second product. **GB Battery Watch** (Power BI) ans
 ## Setup (Windows, PowerShell)
 
 ```powershell
-git clone https://github.com/hutchybakes-glitch/gb-grid-live.git
+git clone https://github.com/swhutchinson/gb-grid-live.git
 cd gb-grid-live
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
