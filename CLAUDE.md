@@ -1,10 +1,10 @@
 # CLAUDE.md — standing rules for this repository
 
-You are building **GB Grid Live**, a public portfolio project by Samuel (Senior Analyst, moving into analytics / data engineering). Read `SPEC.md`, `DATA.md`, `DESIGN.md`, `PHASES.md` and `ACCEPTANCE.md` before any work. They are the source of truth; if they conflict, stop and ask.
+You are building **GB Grid Live**, a public portfolio project by Samuel (Senior Analyst, moving into analytics / data engineering). Read `docs/spec/SPEC.md`, `docs/spec/DATA.md`, `docs/spec/DESIGN.md`, `docs/spec/PHASES.md` and `docs/spec/ACCEPTANCE.md` before any work. They are the source of truth; if they conflict, stop and ask.
 
 ## How to work
-- Work one phase at a time, as defined in `PHASES.md`. Start each phase in plan mode: summarise what you will build, then build it.
-- A phase is finished only when every item for that phase in `ACCEPTANCE.md` passes. Run the checks yourself and paste the results into `docs/BUILD_LOG.md`.
+- Work one phase at a time, as defined in `docs/spec/PHASES.md`. Start each phase in plan mode: summarise what you will build, then build it.
+- A phase is finished only when every item for that phase in `docs/spec/ACCEPTANCE.md` passes. Run the checks yourself and paste the results into `docs/BUILD_LOG.md`.
 - Never mark something done that you have not run. If a check cannot pass, say so plainly in the build log.
 - Record every non-obvious choice in `docs/DECISIONS.md`: date, decision, options considered, why.
 - Keep `docs/BUILD_LOG.md` up to date: what was built in each session, what broke, how it was fixed, and what the human should review.
@@ -34,7 +34,7 @@ You are building **GB Grid Live**, a public portfolio project by Samuel (Senior 
 ## Safety and hygiene
 - No secrets are needed for this project. Never add API keys, tokens or personal data to the repo.
 - Respect the APIs: cache responses, at most ~1 request per second, no pointless polling. Credit sources in the site footer (Carbon Intensity API: CC BY 4.0, NESO; PV_Live: Sheffield Solar / NESO).
-- Do not use any company's logo or branding. The project has its own identity (see `DESIGN.md`).
+- Do not use any company's logo or branding. The project has its own identity (see `docs/spec/DESIGN.md`).
 - Do not run `git push`, create remote repositories or publish anything unless the human explicitly asks. Local commits are fine and encouraged: small commits with clear messages.
 
 ## When unsure

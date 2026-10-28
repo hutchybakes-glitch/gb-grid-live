@@ -1,7 +1,7 @@
 // The selected region, shared across pages and remembered for the session.
 import { useSyncExternalStore } from 'react'
 
-export const DEFAULT_REGION = 3 // North West England (SPEC.md)
+export const DEFAULT_REGION = 3 // North West England (docs/spec/SPEC.md)
 const KEY = 'gbgl-region'
 const listeners = new Set<() => void>()
 

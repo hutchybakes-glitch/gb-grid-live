@@ -1,4 +1,4 @@
-/* Design tokens from DESIGN.md. Dark is the default; light via data-theme. */
+/* Design tokens from docs/spec/DESIGN.md. Dark is the default; light via data-theme. */
 :root,
 :root[data-theme='dark'] {
   --bg: #0e1621;

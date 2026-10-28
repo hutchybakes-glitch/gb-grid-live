@@ -1,4 +1,4 @@
-// Fixed colours from DESIGN.md, shared by every chart and the map.
+// Fixed colours from docs/spec/DESIGN.md, shared by every chart and the map.
 
 export type Band = 'very low' | 'low' | 'moderate' | 'high' | 'very high'
 

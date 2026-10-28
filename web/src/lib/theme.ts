@@ -1,4 +1,4 @@
-// Light/dark theme, stored per viewer. Dark is the default (DESIGN.md).
+// Light/dark theme, stored per viewer. Dark is the default (docs/spec/DESIGN.md).
 import { useSyncExternalStore } from 'react'
 
 export type Theme = 'dark' | 'light'

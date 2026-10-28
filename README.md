@@ -80,4 +80,4 @@ npm run e2e          # smoke tests against the production build (desktop and 360
 Independent project, not affiliated with NESO, Sheffield Solar, Elexon or any energy supplier.
 
 ## Built with Claude Code
-The code was written by Claude Code working from a written spec (`SPEC.md`, `DATA.md`, `DESIGN.md`, `PHASES.md`, `ACCEPTANCE.md`) in five phases, each ending with acceptance checks whose evidence is recorded in the build log. Samuel wrote the spec, made the product decisions and reviewed each phase.
+The code was written by Claude Code working from a written spec (`docs/spec/SPEC.md`, `docs/spec/DATA.md`, `docs/spec/DESIGN.md`, `docs/spec/PHASES.md`, `docs/spec/ACCEPTANCE.md`) in five phases, each ending with acceptance checks whose evidence is recorded in the build log. Samuel wrote the spec, made the product decisions and reviewed each phase.
